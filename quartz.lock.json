@@ -169,18 +169,6 @@
       "commit": "4ad984e087449e619ee1629772c130c71ae163f0",
       "installedAt": "2026-05-26T22:32:05.371Z"
     },
-    "obsidian-plugin-excalidraw": {
-      "source": "github:quartz-community/obsidian-plugin-excalidraw",
-      "resolved": "https://github.com/quartz-community/obsidian-plugin-excalidraw.git",
-      "commit": "9c5ff6bd6d2ee27814aeaf98ac4ddfd025a985fa",
-      "installedAt": "2026-05-25T17:40:01.376Z"
-    },
-    "obsidian-plugin-ttrpg-tools-maps": {
-      "source": "github:quartz-community/obsidian-plugin-ttrpg-tools-maps",
-      "resolved": "https://github.com/quartz-community/obsidian-plugin-ttrpg-tools-maps.git",
-      "commit": "c43314724a7606dd18b90972c457f593ccded5f5",
-      "installedAt": "2026-05-24T15:36:16.983Z"
-    },
     "og-image": {
       "source": "github:quartz-community/og-image",
       "resolved": "https://github.com/quartz-community/og-image.git",
@@ -198,17 +186,6 @@
       "resolved": "https://github.com/quartz-community/page-title.git",
       "commit": "a53cf02ce7faca400bcf3cfeed47eb860329e534",
       "installedAt": "2026-05-24T15:36:16.998Z"
-    },
-    "quartz-themes": {
-      "source": {
-        "name": "quartz-themes",
-        "repo": "github:saberzero1/quartz-themes",
-        "subdir": "plugin"
-      },
-      "resolved": "https://github.com/saberzero1/quartz-themes.git",
-      "commit": "b82021d7866c11353a0cc55b75ac3198d988d7d7",
-      "subdir": "plugin",
-      "installedAt": "2026-05-26T16:05:23.365Z"
     },
     "reader-mode": {
       "source": "github:quartz-community/reader-mode",

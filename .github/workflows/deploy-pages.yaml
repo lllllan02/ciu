@@ -1,24 +1,31 @@
-name: Build Preview Deployment
+name: Deploy Quartz site to GitHub Pages
 
 on:
-  pull_request:
-    types: [opened, synchronize]
+  push:
+    branches:
+      - master
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
-  build-preview:
-    if: ${{ github.repository == 'jackyzha0/quartz' }}
+  build:
     runs-on: ubuntu-latest
-    name: Build Preview
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Setup Node
-        uses: actions/setup-node@v6
+      - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Cache dependencies
         uses: actions/cache@v5
@@ -41,14 +48,21 @@ jobs:
       - name: Install Quartz plugins
         run: npx quartz plugin install
 
-      - name: Check types and style
-        run: npm run check
-
       - name: Build Quartz
-        run: npx quartz build -d docs -v
+        run: npx quartz build
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v6
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          name: preview-build
           path: public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
