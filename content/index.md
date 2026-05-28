@@ -11,6 +11,8 @@ title: Coding Interview University 的学习记录
 
 ## 算法复杂度 / Big-O
 
+算法复杂度用 **Big-O** 记号描述：当输入规模 $n$ 变大时，算法在时间和空间上大约如何增长。它忽略常数和低阶项，只关心增长趋势，用来比较不同做法谁更快、谁更省内存，也是面试里分析排序、查找、遍历等代码时的常用语言。
+
 - [x] [Harvard CS50 - 渐进符号（视频）](https://www.youtube.com/watch?v=iOq5kSKqeR4) (2026-01-28)
 - [x] [Derek Banas - 大 O 符号（视频）](https://www.youtube.com/watch?v=V6mKVRU1evU) (2026-01-28)
 - [x] [MIT 6.046J - 摊还分析（视频）](https://www.youtube.com/watch?v=B3SpQZaAZP4&index=10&list=PL1BaGV1cIH4UhkL8a9bJGG356covJ76qN) (2026-01-29)
@@ -25,6 +27,8 @@ title: Coding Interview University 的学习记录
 
 ### 数组（Arrays）
 
+数组把元素放在**连续内存**里，用下标可在 $O(1)$ 时间内随机访问任意位置；在末尾增删通常也很快，但在中间插入或删除需要挪动后面的元素，一般是 $O(n)$。固定长度的数组容量写死；**动态数组**在元素变多时自动扩容（常见做法是容量翻倍），是多数语言里 `vector`、列表等容器的底层思路。
+
 - [x] [Harvard CS50 - 数组（视频）](https://www.youtube.com/watch?v=tI_tIZFyKBw&t=3009s) (2026-01-29)
 - [ ] [UC San Diego - 数组（视频）](https://www.coursera.org/lecture/data-structures/arrays-OsBSF)
 - [ ] [UC San Diego - 动态数组（视频）](https://www.coursera.org/lecture/data-structures/dynamic-arrays-EwbnV)
@@ -33,7 +37,9 @@ title: Coding Interview University 的学习记录
 
 > - [x] [实现动态数组](/data-structure/arrays) (2026-02-01)
 
-### 链表（Linked Lists）
+### 链表（Linked Lists） 
+
+链表由一个个**节点**串成，每个节点存数据和指向下一个节点的指针；元素在内存里不必连续。已知位置时，在头尾或中间插入、删除往往只需改指针，是 $O(1)$；但按序号访问要从头往后走，是 $O(n)$。**单向链表**只指向前驱；**双向链表**多一个指向前节点的指针，便于从尾部往前删改，代价是每个节点多占一点空间。
 
 - [x] [Harvard CS50 - 链表（视频）](https://www.youtube.com/watch?v=2T-A_GFuoTo&t=650s) (2026-02-07)
 - [x] [Michael Sambol - 4 分钟了解链表（视频）](https://youtu.be/F8AbOfQwl1c) (2026-02-28)
@@ -50,6 +56,8 @@ title: Coding Interview University 的学习记录
 
 ### 堆栈（Stack）
 
+堆栈是一种 **后进先出（LIFO）** 的线性结构：只在同一端压入（push）和弹出（pop），查看栈顶也是 $O(1)$。用数组或链表都能实现，数组版更简单。常见于函数调用栈、括号匹配、DFS、撤销操作等「先处理最近压入的」场景。
+
 - [x] [Michael Sambol - Stacks in 3 minutes](https://youtu.be/KcT3aVgrrpU) (2026-03-01)
 - [ ] [UC San Diego - 堆栈](https://www.coursera.org/learn/data-structures/lecture/UdKzQ/stacks)
 
@@ -57,37 +65,40 @@ title: Coding Interview University 的学习记录
 
 ### 队列（Queue）
 
+队列是一种 **先进先出（FIFO）** 的线性结构：从一端入队（enqueue）、另一端出队（dequeue），两端操作都是 $O(1)$。与堆栈相对，适合 BFS、任务调度、消息缓冲等「先来的先处理」场景。用数组实现时常配合**循环队列**，避免频繁搬移元素；用链表实现则头尾各维护指针即可。
+
 - [x] [Michael Sambol - Queues in 3 minutes](https://youtu.be/D6gu-_tmEpQ) (2026-03-01)
 - [ ] [圆形队列](https://en.wikipedia.org/wiki/Circular_buffer)
 - [ ] [UC San Diego - 队列](https://www.coursera.org/learn/data-structures/lecture/EShpq/queue)
 
 > - [x] [实现队列](/data-structure/queue) (2026-03-04)
 
-- ### 哈希表（Hash table）
-    - [ ] 视频：
-        - [ ] [链式哈希表（视频）](https://www.youtube.com/watch?v=0M_kIqhwbFo&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb&index=8)
-        - [ ] [Table Doubling 和 Karp-Rabin（视频）](https://www.youtube.com/watch?v=BRO7mVIFt08&index=9&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb)
-        - [ ] [Open Addressing 和密码型哈希（Cryptographic Hashing）（视频）](https://www.youtube.com/watch?v=rvdJDijO2Ro&index=10&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb)
-        - [ ] [PyCon 2010：强大的字典（视频）](https://www.youtube.com/watch?v=C4Kc8xzcA68)
-        - [ ] [PyCon 2017：字典更强大（视频）](https://www.youtube.com/watch?v=66P5FMkWoVU)
-        - [ ] [(高级) 随机化：通用和完美哈希（视频）](https://www.youtube.com/watch?v=z0lJ2k0sl1g&list=PLUl4u3cNGP6317WaSNfmCvGym2ucw3oGp&index=11)
-        - [ ] [(进阶)完美哈希（Perfect hashing）（视频）](https://www.youtube.com/watch?v=N0COwN14gt0&list=PL2B4EEwhKD-NbwZ4ezj7gyc_3yNrojKM9&index=4)
-        - [ ] [[复习]4 分钟了解哈希表（视频）](https://youtu.be/knV86FlSXJ8)
+### 哈希表（Hash table） 
 
-    - [ ] 在线课程：
-        - [ ] [核心哈希表（视频）](https://www.coursera.org/lecture/data-structures-optimizing-performance/core-hash-tables-m7UuP)
-        - [ ] [数据结构（视频）](https://www.coursera.org/learn/data-structures/home/week/4)
-        - [ ] [电话簿问题（视频）](https://www.coursera.org/lecture/data-structures/phone-book-problem-NYZZP)
-        - [ ] 分布式哈希表：
-            - [Dropbox 中的即时上传和存储优化（视频）](https://www.coursera.org/lecture/data-structures/instant-uploads-and-storage-optimization-in-dropbox-DvaIb)
-            - [分布式哈希表（视频）](https://www.coursera.org/lecture/data-structures/distributed-hash-tables-tvH8H)
+哈希表用**哈希函数**把键映射到桶下标，在理想情况下插入、查找、删除的平均时间都是 $O(1)$。不同键可能落到同一位置（冲突），常见处理方式是**链式法**（每个桶挂链表）或**开放寻址**（在表里探测下一个空位）。语言里的 `dict` / `map`、缓存、计数表等都依赖这一结构；负载因子过高时要扩容并 rehash。
 
-    - [ ] 使用线性探测法的数组实现
-        - hash(k, m) - m 是哈希表的大小
-        - add(key, value) - 如果键已存在，则更新值
-        - exists(key) - 检查键是否存在
-        - get(key) - 获取给定键的值
-        - remove(key) - 删除给定键的值
+- [ ] [链式哈希表（视频）](https://www.youtube.com/watch?v=0M_kIqhwbFo&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb&index=8)
+- [ ] [Table Doubling 和 Karp-Rabin（视频）](https://www.youtube.com/watch?v=BRO7mVIFt08&index=9&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb)
+- [ ] [Open Addressing 和密码型哈希（Cryptographic Hashing）（视频）](https://www.youtube.com/watch?v=rvdJDijO2Ro&index=10&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb)
+- [ ] [PyCon 2010：强大的字典（视频）](https://www.youtube.com/watch?v=C4Kc8xzcA68)
+- [ ] [PyCon 2017：字典更强大（视频）](https://www.youtube.com/watch?v=66P5FMkWoVU)
+- [ ] [(高级) 随机化：通用和完美哈希（视频）](https://www.youtube.com/watch?v=z0lJ2k0sl1g&list=PLUl4u3cNGP6317WaSNfmCvGym2ucw3oGp&index=11)
+- [ ] [(进阶)完美哈希（Perfect hashing）（视频）](https://www.youtube.com/watch?v=N0COwN14gt0&list=PL2B4EEwhKD-NbwZ4ezj7gyc_3yNrojKM9&index=4)
+- [ ] [[复习]4 分钟了解哈希表（视频）](https://youtu.be/knV86FlSXJ8)
+
+- [ ] [核心哈希表（视频）](https://www.coursera.org/lecture/data-structures-optimizing-performance/core-hash-tables-m7UuP)
+- [ ] [数据结构（视频）](https://www.coursera.org/learn/data-structures/home/week/4)
+- [ ] [电话簿问题（视频）](https://www.coursera.org/lecture/data-structures/phone-book-problem-NYZZP)
+- [ ] 分布式哈希表：
+    - [Dropbox 中的即时上传和存储优化（视频）](https://www.coursera.org/lecture/data-structures/instant-uploads-and-storage-optimization-in-dropbox-DvaIb)
+    - [分布式哈希表（视频）](https://www.coursera.org/lecture/data-structures/distributed-hash-tables-tvH8H)
+
+- [ ] 使用线性探测法的数组实现
+    - hash(k, m) - m 是哈希表的大小
+    - add(key, value) - 如果键已存在，则更新值
+    - exists(key) - 检查键是否存在
+    - get(key) - 获取给定键的值
+    - remove(key) - 删除给定键的值
 
 ## 更多的知识
 
