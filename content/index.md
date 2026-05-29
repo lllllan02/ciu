@@ -77,6 +77,8 @@ title: Coding Interview University 的学习记录
 
 哈希表用**哈希函数**把键映射到桶下标，在理想情况下插入、查找、删除的平均时间都是 $O(1)$。不同键可能落到同一位置（冲突），常见处理方式是**链式法**（每个桶挂链表）或**开放寻址**（在表里探测下一个空位）。语言里的 `dict` / `map`、缓存、计数表等都依赖这一结构；负载因子过高时要扩容并 rehash。
 
+- [x] [OI Wiki - 哈希表](https://oi-wiki.org/ds/hash/) (2026-05-29)
+- [x] [菜鸟教程 - 哈希表](https://www.runoob.com/data-structures/dsa-hash-table.html) (2026-05-29)
 - [ ] [链式哈希表（视频）](https://www.youtube.com/watch?v=0M_kIqhwbFo&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb&index=8)
 - [ ] [Table Doubling 和 Karp-Rabin（视频）](https://www.youtube.com/watch?v=BRO7mVIFt08&index=9&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb)
 - [ ] [Open Addressing 和密码型哈希（Cryptographic Hashing）（视频）](https://www.youtube.com/watch?v=rvdJDijO2Ro&index=10&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb)
@@ -85,7 +87,6 @@ title: Coding Interview University 的学习记录
 - [ ] [(高级) 随机化：通用和完美哈希（视频）](https://www.youtube.com/watch?v=z0lJ2k0sl1g&list=PLUl4u3cNGP6317WaSNfmCvGym2ucw3oGp&index=11)
 - [ ] [(进阶)完美哈希（Perfect hashing）（视频）](https://www.youtube.com/watch?v=N0COwN14gt0&list=PL2B4EEwhKD-NbwZ4ezj7gyc_3yNrojKM9&index=4)
 - [ ] [[复习]4 分钟了解哈希表（视频）](https://youtu.be/knV86FlSXJ8)
-
 - [ ] [核心哈希表（视频）](https://www.coursera.org/lecture/data-structures-optimizing-performance/core-hash-tables-m7UuP)
 - [ ] [数据结构（视频）](https://www.coursera.org/learn/data-structures/home/week/4)
 - [ ] [电话簿问题（视频）](https://www.coursera.org/lecture/data-structures/phone-book-problem-NYZZP)
