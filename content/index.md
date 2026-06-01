@@ -94,12 +94,7 @@ title: Coding Interview University 的学习记录
     - [Dropbox 中的即时上传和存储优化（视频）](https://www.coursera.org/lecture/data-structures/instant-uploads-and-storage-optimization-in-dropbox-DvaIb)
     - [分布式哈希表（视频）](https://www.coursera.org/lecture/data-structures/distributed-hash-tables-tvH8H)
 
-- [ ] 使用线性探测法的数组实现
-    - hash(k, m) - m 是哈希表的大小
-    - add(key, value) - 如果键已存在，则更新值
-    - exists(key) - 检查键是否存在
-    - get(key) - 获取给定键的值
-    - remove(key) - 删除给定键的值
+> - [x] [实现链式哈希表](/data-structure/hash-tables) (2026-06-01)
 
 ## 更多的知识
 
