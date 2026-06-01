@@ -98,15 +98,19 @@ title: Coding Interview University 的学习记录
 
 ## 更多的知识
 
-- ### 二分查找（Binary search）
-    - [ ] [二分查找（视频）](https://www.youtube.com/watch?v=D5SrAga1pno)
-    - [ ] [二分查找（视频）](https://www.khanacademy.org/computing/computer-science/algorithms/binary-search/a/binary-search)
-    - [ ] [详情](https://www.topcoder.com/community/data-science/data-science-tutorials/binary-search/)
-    - [ ] [蓝图](https://leetcode.com/discuss/general-discussion/786126/python-powerful-ultimate-binary-search-template-solved-many-problems)   
-    - [ ] [【复习】四分钟二分查找(视频)](https://youtu.be/fDKIpRe8GW4)
-    - [ ] 实现：
-        - 二分查找（在一个已排序好的整型数组中查找）
-        - 迭代式二分查找
+### 二分查找（Binary search）
+
+二分查找在 **已排序** 的序列上工作：每次取中间元素与目标比较，根据大小关系丢弃左半或右半，直到找到或区间为空。每轮比较都能排除约一半元素，时间复杂度 $O(\log n)$；用循环实现时额外空间只需 $O(1)$。这是分治思想的典型应用，也是找边界、最小满足条件等许多算法题的基础模板。
+
+- [x] [OI Wiki - 二分查找](https://oi-wiki.org/basic/binary/) (2026-06-01)
+- [ ] [二分查找（视频）](https://www.youtube.com/watch?v=D5SrAga1pno)
+- [ ] [二分查找（视频）](https://www.khanacademy.org/computing/computer-science/algorithms/binary-search/a/binary-search)
+- [ ] [详情](https://www.topcoder.com/community/data-science/data-science-tutorials/binary-search/)
+- [ ] [蓝图](https://leetcode.com/discuss/general-discussion/786126/python-powerful-ultimate-binary-search-template-solved-many-problems)   
+- [ ] [【复习】四分钟二分查找(视频)](https://youtu.be/fDKIpRe8GW4)
+- [ ] 实现：
+    - 二分查找（在一个已排序好的整型数组中查找）
+    - 迭代式二分查找
 
 - ### 按位运算（Bitwise operations）
     - [ ] [Bits 速查表](https://github.com/jwasham/coding-interview-university/blob/main/extras/cheat%20sheets/bits-cheat-sheet.pdf) ── 你需要知道大量 2 的幂数值（从 2^1 到 2^16 及 2^32）
