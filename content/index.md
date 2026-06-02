@@ -108,9 +108,8 @@ title: Coding Interview University 的学习记录
 - [ ] [详情](https://www.topcoder.com/community/data-science/data-science-tutorials/binary-search/)
 - [ ] [蓝图](https://leetcode.com/discuss/general-discussion/786126/python-powerful-ultimate-binary-search-template-solved-many-problems)   
 - [ ] [【复习】四分钟二分查找(视频)](https://youtu.be/fDKIpRe8GW4)
-- [ ] 实现：
-    - 二分查找（在一个已排序好的整型数组中查找）
-    - 迭代式二分查找
+
+> - [x] [实现二分查找](/data-structure/binary-search) (2026-06-02)
 
 - ### 按位运算（Bitwise operations）
     - [ ] [Bits 速查表](https://github.com/jwasham/coding-interview-university/blob/main/extras/cheat%20sheets/bits-cheat-sheet.pdf) ── 你需要知道大量 2 的幂数值（从 2^1 到 2^16 及 2^32）
