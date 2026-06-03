@@ -133,6 +133,12 @@
       "commit": "9e3f6d734d886eac0d41841c4dc8862b377fcaf4",
       "installedAt": "2026-05-25T15:27:47.250Z"
     },
+    "full-width-tables": {
+      "source": "github:quartz-lib/full-width-tables",
+      "resolved": "https://github.com/quartz-lib/full-width-tables.git",
+      "commit": "917e17bad4739c5d0a12489c611c6fab908f00d7",
+      "installedAt": "2026-06-03T07:14:29.752Z"
+    },
     "github-flavored-markdown": {
       "source": "github:quartz-community/github-flavored-markdown",
       "resolved": "https://github.com/quartz-community/github-flavored-markdown.git",

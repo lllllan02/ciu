@@ -246,6 +246,13 @@ plugins:
       position: beforeBody
       priority: 15
       display: all
+  - source: github:quartz-lib/full-width-tables
+    enabled: true
+    options:
+      containerClass: full-width-tables
+      tableLayout: auto
+      stretchToViewport: false
+    order: 50
 layout:
   groups:
     toolbar:
