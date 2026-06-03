@@ -111,32 +111,32 @@ title: Coding Interview University 的学习记录
 
 > - [x] [实现二分查找](/data-structure/binary-search) (2026-06-02)
 
-- ### 按位运算（Bitwise operations）
-    - [ ] [Bits 速查表](https://github.com/jwasham/coding-interview-university/blob/main/extras/cheat%20sheets/bits-cheat-sheet.pdf) ── 你需要知道大量 2 的幂数值（从 2^1 到 2^16 及 2^32）
-    - [ ] 好好理解位操作符的含义：&、|、^、~、>>、<<
-        - [ ] [字码（words）](https://en.wikipedia.org/wiki/Word_(computer_architecture))
-        - [ ] 好的介绍：
-            [位操作（视频）](https://www.youtube.com/watch?v=7jkIUgLC29I)
-        - [ ] [C 语言编程教程 2-10：按位运算（视频）](https://www.youtube.com/watch?v=d0AwjSpNXR0)
-        - [ ] [位操作](https://en.wikipedia.org/wiki/Bit_manipulation)
-        - [ ] [按位运算](https://en.wikipedia.org/wiki/Bitwise_operation)
-        - [ ] [Bithacks](https://graphics.stanford.edu/~seander/bithacks.html)
-        - [ ] [位元抚弄者（The Bit Twiddler）](http://bits.stephan-brumme.com/)
-        - [ ] [交互式位元抚弄者（The Bit Twiddler Interactive）](http://bits.stephan-brumme.com/interactive.html)
-        - [ ] [位操作技巧（Bit Hacks）（视频）](https://www.youtube.com/watch?v=ZusiKXcz_ac)
-        - [ ] [练习位操作](https://pconrad.github.io/old_pconrad_cs16/topics/bitOps/)
-    - [ ] 一补数和补码
-        - [二进制：利 & 弊（为什么我们要使用补码）（视频）](https://www.youtube.com/watch?v=lKTsv6iVxV4)
-        - [一补数（1s Complement）](https://en.wikipedia.org/wiki/Ones%27_complement)
-        - [补码（2s Complement）](https://en.wikipedia.org/wiki/Two%27s_complement)
-    - [ ] 计算置位（Set Bits）
-        - [计算一个字节中置位（Set Bits）的四种方式（视频）](https://youtu.be/Hzuzo9NJrlc)
-        - [计算比特位](https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetKernighan)
-        - [如何在一个 32 位的整型中计算置位（Set Bits）的数量](http://stackoverflow.com/questions/109023/how-to-count-the-number-of-set-bits-in-a-32-bit-integer)
-    - [ ] 交换值：
-        - [交换（Swap）](http://bits.stephan-brumme.com/swap.html)
-    - [ ] 绝对值：
-        - [绝对整型（Absolute Integer）](http://bits.stephan-brumme.com/absInteger.html)
+### 按位运算（Bitwise operations）
+
+- [x] [菜鸟教程 - 位运算](https://www.runoob.com/w3cnote/bit-operation.html) (2026-06-03)
+- [x] [OI Wiki - 位操作](https://oi-wiki.org/misc/bit/) (2026-06-03)
+- [ ] [Bits 速查表](https://github.com/jwasham/coding-interview-university/blob/main/extras/cheat%20sheets/bits-cheat-sheet.pdf) ── 你需要知道大量 2 的幂数值（从 2^1 到 2^16 及 2^32）
+- [ ] 好好理解位操作符的含义：&、|、^、~、>>、<<
+    - [ ] [字码（words）](https://en.wikipedia.org/wiki/Word_(computer_architecture))
+    - [ ] [位操作（视频）](https://www.youtube.com/watch?v=7jkIUgLC29I)
+    - [ ] [C 语言编程教程 2-10：按位运算（视频）](https://www.youtube.com/watch?v=d0AwjSpNXR0)
+    - [ ] [位操作](https://en.wikipedia.org/wiki/Bit_manipulation)
+    - [ ] [按位运算](https://en.wikipedia.org/wiki/Bitwise_operation)
+    - [ ] [Bithacks](https://graphics.stanford.edu/~seander/bithacks.html)
+    - [ ] [位元抚弄者（The Bit Twiddler）](http://bits.stephan-brumme.com/)
+    - [ ] [交互式位元抚弄者（The Bit Twiddler Interactive）](http://bits.stephan-brumme.com/interactive.html)
+    - [ ] [位操作技巧（Bit Hacks）（视频）](https://www.youtube.com/watch?v=ZusiKXcz_ac)
+    - [ ] [练习位操作](https://pconrad.github.io/old_pconrad_cs16/topics/bitOps/)
+- [ ] 一补数和补码
+    - [二进制：利 & 弊（为什么我们要使用补码）（视频）](https://www.youtube.com/watch?v=lKTsv6iVxV4)
+    - [一补数（1s Complement）](https://en.wikipedia.org/wiki/Ones%27_complement)
+    - [补码（2s Complement）](https://en.wikipedia.org/wiki/Two%27s_complement)
+- [ ] 计算置位（Set Bits）
+    - [计算一个字节中置位（Set Bits）的四种方式（视频）](https://youtu.be/Hzuzo9NJrlc)
+    - [计算比特位](https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetKernighan)
+    - [如何在一个 32 位的整型中计算置位（Set Bits）的数量](http://stackoverflow.com/questions/109023/how-to-count-the-number-of-set-bits-in-a-32-bit-integer)
+- [ ] [交换（Swap）](http://bits.stephan-brumme.com/swap.html)
+- [x] [绝对整型（Absolute Integer）](/data-structure/bitwise-absolute-integer) (2026-06-03)
 
 ## 树（Trees）
 
