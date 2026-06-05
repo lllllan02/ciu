@@ -160,56 +160,38 @@ title: Coding Interview University 的学习记录
 
 - [ ] [交换（Swap）](http://bits.stephan-brumme.com/swap.html)
 
-
 ## 树（Trees）
 
-- ### 树-介绍
-    - [ ] [树的介绍（视频）](https://www.coursera.org/learn/data-structures/lecture/95qda/trees)
-    - [ ] [树遍历（视频）](https://www.coursera.org/lecture/data-structures/tree-traversal-fr51b)
-    - [ ] [BFS（广度优先搜索）和 DFS（深度优先搜索）（视频）](https://www.youtube.com/watch?v=uWL6FJhq5fM)
-        - BFS 笔记
-            - 层次遍历（BFS，使用队列）
-            - 时间复杂度： O(n)
-            - 空间复杂度：最佳情况：O(1)，最坏情况：O(n/2)=O(n)
-        - DFS 笔记：
-            - 时间复杂度：O(n)
-            - 空间复杂度：
-                - 最好情况：O(log n) - 树的平均高度
-                - 最坏情况：O(n)
-            - 中序遍历（DFS：左、节点本身、右）
-            - 后序遍历（DFS：左、右、节点本身）
-            - 先序遍历（DFS：节点本身、左、右）
-    - [ ] [[复习]4 分钟内的广度优先搜索（视频）](https://youtu.be/HZ5YTanv5QE)
-    - [ ] [[复习] 4 分钟内的深度优先搜索（视频）](https://youtu.be/Urx87-NMm6c)
-    - [ ] [[复习]11 分钟内的树遍历（播放列表）（视频）](https://www.youtube.com/playlist?list=PL9xmBV_5YoZO1JC2RgEi04nLy6D-rKk6b)
+### 树-介绍
 
-- ### 二叉查找树（Binary search trees）：BSTs
-    - [ ] [二叉搜索树复习（视频）](https://www.youtube.com/watch?v=x6At0nzX92o&index=1&list=PLA5Lqm4uh9Bbq-E0ZnqTIa8LRaL77ica6)
-    - [ ] [介绍（视频）](https://www.coursera.org/learn/data-structures/lecture/E7cXP/introduction)
-    - [ ] [MIT（视频）](https://www.youtube.com/watch?v=9Jry5-82I68)
-    - C/C++:
-        - [ ] [二叉查找树 —— 在 C/C++ 中实现（视频）](https://www.youtube.com/watch?v=COZK7NATh4k&list=PL2_aWCzGMAwI3W_JlcBbtYTwiQSsOTa6P&index=28)
-        - [ ] [BST 的实现 —— 在堆栈和堆中的内存分配（视频）](https://www.youtube.com/watch?v=hWokyBoo0aI&list=PL2_aWCzGMAwI3W_JlcBbtYTwiQSsOTa6P&index=29)
-        - [ ] [在二叉查找树中找到最小和最大的元素（视频）](https://www.youtube.com/watch?v=Ut90klNN264&index=30&list=PL2_aWCzGMAwI3W_JlcBbtYTwiQSsOTa6P)
-        - [ ] [寻找二叉树的高度（视频）](https://www.youtube.com/watch?v=_pnqMz5nrRs&list=PL2_aWCzGMAwI3W_JlcBbtYTwiQSsOTa6P&index=31)
-        - [ ] [二叉树的遍历 —— 广度优先和深度优先策略（视频）](https://www.youtube.com/watch?v=9RHO6jU--GU&list=PL2_aWCzGMAwI3W_JlcBbtYTwiQSsOTa6P&index=32)
-        - [ ] [二叉树：层序遍历（视频）](https://www.youtube.com/watch?v=86g8jAQug04&index=33&list=PL2_aWCzGMAwI3W_JlcBbtYTwiQSsOTa6P)
-        - [ ] [二叉树的遍历：先序、中序、后序（视频）](https://www.youtube.com/watch?v=gm8DUJJhmY4&index=34&list=PL2_aWCzGMAwI3W_JlcBbtYTwiQSsOTa6P)
-        - [ ] [判断一棵二叉树是否为二叉查找树（视频）](https://www.youtube.com/watch?v=yEwSGhSsT0U&index=35&list=PL2_aWCzGMAwI3W_JlcBbtYTwiQSsOTa6P)
-        - [ ] [从二叉查找树中删除一个节点（视频）](https://www.youtube.com/watch?v=gcULXE7ViZw&list=PL2_aWCzGMAwI3W_JlcBbtYTwiQSsOTa6P&index=36)
-        - [ ] [二叉查找树中序遍历的后继者（视频）](https://www.youtube.com/watch?v=5cPbNCrdotA&index=37&list=PL2_aWCzGMAwI3W_JlcBbtYTwiQSsOTa6P)
-    - [ ] 实现：
-        - [ ] [insert    // 将值插入树中](https://leetcode.com/problems/insert-into-a-binary-search-tree/submissions/987660183/)
-        - [ ] get_node_count // 查找树上的节点数
-        - [ ] print_values // 从小到大打印树中节点的值
-        - [ ] delete_tree
-        - [ ] is_in_tree // 如果值存在于树中则返回 true
-        - [ ] [get_height // 以节点为单位返回高度（单个节点的高度为 1）](https://www.geeksforgeeks.org/find-the-maximum-depth-or-height-of-a-tree/)
-        - [ ] get_min   // 返回树上的最小值
-        - [ ] get_max   // 返回树上的最大值
-        - [ ] is_binary_search_tree
-        - [ ] delete_value
-        - [ ] get_successor // 返回给定值的后继者，若没有则返回-1
+- [x] [菜鸟教程 - 树形结构](https://www.runoob.com/data-structures/dsa-tree.html) (2026-06-04)
+- [x] [OI Wiki - 树基础](https://oi-wiki.org/graph/tree/) (2026-06-05)
+- [ ] [树的介绍（视频）](https://www.coursera.org/learn/data-structures/lecture/95qda/trees)
+- [ ] [树遍历（视频）](https://www.coursera.org/lecture/data-structures/tree-traversal-fr51b)
+- [ ] [BFS（广度优先搜索）和 DFS（深度优先搜索）（视频）](https://www.youtube.com/watch?v=uWL6FJhq5fM)
+- [ ] [[复习]4 分钟内的广度优先搜索（视频）](https://youtu.be/HZ5YTanv5QE)
+- [ ] [[复习] 4 分钟内的深度优先搜索（视频）](https://youtu.be/Urx87-NMm6c)
+- [ ] [[复习]11 分钟内的树遍历（播放列表）（视频）](https://www.youtube.com/playlist?list=PL9xmBV_5YoZO1JC2RgEi04nLy6D-rKk6b)
+
+### 二叉查找树（Binary search trees）：BSTs
+
+- [x] [OI Wiki - 二叉搜索树 & 平衡树](https://oi-wiki.org/ds/bst/) (2026-06-05)
+- [ ] [二叉搜索树复习（视频）](https://www.youtube.com/watch?v=x6At0nzX92o&index=1&list=PLA5Lqm4uh9Bbq-E0ZnqTIa8LRaL77ica6)
+- [ ] [介绍（视频）](https://www.coursera.org/learn/data-structures/lecture/E7cXP/introduction)
+- [ ] [MIT（视频）](https://www.youtube.com/watch?v=9Jry5-82I68)
+- C/C++:
+    - [ ] [二叉查找树 —— 在 C/C++ 中实现（视频）](https://www.youtube.com/watch?v=COZK7NATh4k&list=PL2_aWCzGMAwI3W_JlcBbtYTwiQSsOTa6P&index=28)
+    - [ ] [BST 的实现 —— 在堆栈和堆中的内存分配（视频）](https://www.youtube.com/watch?v=hWokyBoo0aI&list=PL2_aWCzGMAwI3W_JlcBbtYTwiQSsOTa6P&index=29)
+    - [ ] [在二叉查找树中找到最小和最大的元素（视频）](https://www.youtube.com/watch?v=Ut90klNN264&index=30&list=PL2_aWCzGMAwI3W_JlcBbtYTwiQSsOTa6P)
+    - [ ] [寻找二叉树的高度（视频）](https://www.youtube.com/watch?v=_pnqMz5nrRs&list=PL2_aWCzGMAwI3W_JlcBbtYTwiQSsOTa6P&index=31)
+    - [ ] [二叉树的遍历 —— 广度优先和深度优先策略（视频）](https://www.youtube.com/watch?v=9RHO6jU--GU&list=PL2_aWCzGMAwI3W_JlcBbtYTwiQSsOTa6P&index=32)
+    - [ ] [二叉树：层序遍历（视频）](https://www.youtube.com/watch?v=86g8jAQug04&index=33&list=PL2_aWCzGMAwI3W_JlcBbtYTwiQSsOTa6P)
+    - [ ] [二叉树的遍历：先序、中序、后序（视频）](https://www.youtube.com/watch?v=gm8DUJJhmY4&index=34&list=PL2_aWCzGMAwI3W_JlcBbtYTwiQSsOTa6P)
+    - [ ] [判断一棵二叉树是否为二叉查找树（视频）](https://www.youtube.com/watch?v=yEwSGhSsT0U&index=35&list=PL2_aWCzGMAwI3W_JlcBbtYTwiQSsOTa6P)
+    - [ ] [从二叉查找树中删除一个节点（视频）](https://www.youtube.com/watch?v=gcULXE7ViZw&list=PL2_aWCzGMAwI3W_JlcBbtYTwiQSsOTa6P&index=36)
+    - [ ] [二叉查找树中序遍历的后继者（视频）](https://www.youtube.com/watch?v=5cPbNCrdotA&index=37&list=PL2_aWCzGMAwI3W_JlcBbtYTwiQSsOTa6P)
+
+> - [x] [实现二叉搜索树](/data-structure/binary-search-trees) (2026-06-05)
 
 - ### 堆（Heap） / 优先级队列（Priority Queue） / 二叉堆（Binary Heap）
     - 以树形结构可视化，但通常在存储上是线性的（数组、链表）
