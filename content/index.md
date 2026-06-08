@@ -192,6 +192,7 @@ title: Coding Interview University 的学习记录
     - [ ] [二叉查找树中序遍历的后继者（视频）](https://www.youtube.com/watch?v=5cPbNCrdotA&index=37&list=PL2_aWCzGMAwI3W_JlcBbtYTwiQSsOTa6P)
 
 > - [x] [实现二叉搜索树](/data-structure/binary-search-trees) (2026-06-05)
+> - [x] [实现平衡二叉搜索树](/data-structure/balanced-binary-search-trees) (2026-06-08)
 
 - ### 堆（Heap） / 优先级队列（Priority Queue） / 二叉堆（Binary Heap）
     - 以树形结构可视化，但通常在存储上是线性的（数组、链表）
