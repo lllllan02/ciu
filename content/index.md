@@ -162,10 +162,14 @@ title: Coding Interview University 的学习记录
 
 ## 树（Trees）
 
+树是一种**层次化**的非线性结构：节点通过边连接，有且仅有一个根，除根外每个节点只有一个父节点，且不存在环。树是文件系统、DOM、表达式解析以及堆、BST 等许多数据结构的基础；下面先掌握树的基本概念与遍历，再深入二叉搜索树及其平衡变种。
+
 ### 树-介绍
 
+树由**节点**和**边**组成：从根到任意节点有唯一路径。在**二叉树**中，每个节点最多有左、右两个孩子。访问所有节点常用 **BFS（广度优先 / 层序）** 或 **DFS（深度优先：先序、中序、后序）**；二者也是图遍历与大量面试题的基础模板，遍历一棵含 $n$ 个节点的树时间复杂度为 $O(n)$。
+
 - [x] [菜鸟教程 - 树形结构](https://www.runoob.com/data-structures/dsa-tree.html) (2026-06-04)
-- [x] [OI Wiki - 树基础](https://oi-wiki.org/graph/tree/) (2026-06-05)
+- [x] [OI Wiki - 树基础](https://oi-wiki.org/graph/tree-basic/) (2026-06-05)
 - [ ] [树的介绍（视频）](https://www.coursera.org/learn/data-structures/lecture/95qda/trees)
 - [ ] [树遍历（视频）](https://www.coursera.org/lecture/data-structures/tree-traversal-fr51b)
 - [ ] [BFS（广度优先搜索）和 DFS（深度优先搜索）（视频）](https://www.youtube.com/watch?v=uWL6FJhq5fM)
@@ -174,6 +178,8 @@ title: Coding Interview University 的学习记录
 - [ ] [[复习]11 分钟内的树遍历（播放列表）（视频）](https://www.youtube.com/playlist?list=PL9xmBV_5YoZO1JC2RgEi04nLy6D-rKk6b)
 
 ### 二叉查找树（Binary search trees）：BSTs
+
+**二叉搜索树（BST）** 在二叉树基础上满足 BST 性质：左子树所有键值**小于**当前节点，右子树**大于**当前节点，**中序遍历**得到升序序列。树较平衡时，查找、插入、删除的平均时间均为 $O(\log n)$；若按有序顺序插入会退化为链表，最坏为 $O(n)$。语言里的 `std::map` / `TreeMap` 等有序容器都建立在这一思想上，工程实现通常配合 AVL、红黑树等**平衡树**维持高度。
 
 - [x] [OI Wiki - 二叉搜索树 & 平衡树](https://oi-wiki.org/ds/bst/) (2026-06-05)
 - [ ] [二叉搜索树复习（视频）](https://www.youtube.com/watch?v=x6At0nzX92o&index=1&list=PLA5Lqm4uh9Bbq-E0ZnqTIa8LRaL77ica6)
@@ -194,33 +200,34 @@ title: Coding Interview University 的学习记录
 > - [x] [实现二叉搜索树](/data-structure/binary-search-trees) (2026-06-05)
 > - [x] [实现平衡二叉搜索树](/data-structure/balanced-binary-search-trees) (2026-06-08)
 
-- ### 堆（Heap） / 优先级队列（Priority Queue） / 二叉堆（Binary Heap）
-    - 以树形结构可视化，但通常在存储上是线性的（数组、链表）
-    - [ ] [堆（Heap）](https://en.wikipedia.org/wiki/Heap_(data_structure))
-    - [ ] [堆简介（视频）](https://www.coursera.org/lecture/data-structures/introduction-2OpTs)
-    - [ ] [二叉树（视频）](https://www.coursera.org/learn/data-structures/lecture/GRV2q/binary-trees)
-    - [ ] [树高度备注（视频）](https://www.coursera.org/learn/data-structures/supplement/S5xxz/tree-height-remark)
-    - [ ] [基本操作（视频）](https://www.coursera.org/learn/data-structures/lecture/0g1dl/basic-operations)
-    - [ ] [完全二叉树（视频）](https://www.coursera.org/learn/data-structures/lecture/gl5Ni/complete-binary-trees)
-    - [ ] [伪代码（视频）](https://www.coursera.org/learn/data-structures/lecture/HxQo9/pseudocode)
-    - [ ] [堆排序 - 跳转到开始部分（视频）](https://youtu.be/odNJmw5TOEE?list=PLFDnELG9dpVxQCxuD-9BSy2E7BWY3t5Sm&t=3291)
-    - [ ] [堆排序（视频）](https://www.coursera.org/lecture/data-structures/heap-sort-hSzMO)
-    - [ ] [构建堆（视频）](https://www.coursera.org/lecture/data-structures/building-a-heap-dwrOS)
-    - [ ] [MIT：堆和堆排序（视频）](https://www.youtube.com/watch?v=B7hVxCmfPtM&index=4&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb)
-    - [ ] [CS 61B Lecture 24：优先队列（视频）](https://archive.org/details/ucberkeley_webcast_yIUFT6AKBGE)
-    - [ ] [线性时间构建堆（大顶堆）](https://www.youtube.com/watch?v=MiyLo8adrWw)
-    - [ ] [[复习] 13 分钟了解堆（视频）](https://www.youtube.com/playlist?list=PL9xmBV_5YoZNsyqgPW-DNwUeT8F8uhWc6)
-    - [ ] 实现一个大顶堆：
-        - [ ] insert
-        - [ ] sift_up —— 用于插入元素
-        - [ ] get_max —— 返回最大值但不移除元素
-        - [ ] get_size() —— 返回存储的元素数量
-        - [ ] is_empty() —— 若堆为空则返回 true
-        - [ ] extract_max —— 返回最大值并移除
-        - [ ] sift_down —— 用于获取最大值元素
-        - [ ] remove(i) —— 删除指定索引的元素
-        - [ ] heapify —— 构建堆，用于堆排序
-        - [ ] heap_sort() —— 拿到一个未排序的数组，然后使用大顶堆或者小顶堆进行就地排序
+### 堆（Heap） / 优先级队列（Priority Queue） / 二叉堆（Binary Heap）
+
+- 以树形结构可视化，但通常在存储上是线性的（数组、链表）
+- [ ] [堆（Heap）](https://en.wikipedia.org/wiki/Heap_(data_structure))
+- [ ] [堆简介（视频）](https://www.coursera.org/lecture/data-structures/introduction-2OpTs)
+- [ ] [二叉树（视频）](https://www.coursera.org/learn/data-structures/lecture/GRV2q/binary-trees)
+- [ ] [树高度备注（视频）](https://www.coursera.org/learn/data-structures/supplement/S5xxz/tree-height-remark)
+- [ ] [基本操作（视频）](https://www.coursera.org/learn/data-structures/lecture/0g1dl/basic-operations)
+- [ ] [完全二叉树（视频）](https://www.coursera.org/learn/data-structures/lecture/gl5Ni/complete-binary-trees)
+- [ ] [伪代码（视频）](https://www.coursera.org/learn/data-structures/lecture/HxQo9/pseudocode)
+- [ ] [堆排序 - 跳转到开始部分（视频）](https://youtu.be/odNJmw5TOEE?list=PLFDnELG9dpVxQCxuD-9BSy2E7BWY3t5Sm&t=3291)
+- [ ] [堆排序（视频）](https://www.coursera.org/lecture/data-structures/heap-sort-hSzMO)
+- [ ] [构建堆（视频）](https://www.coursera.org/lecture/data-structures/building-a-heap-dwrOS)
+- [ ] [MIT：堆和堆排序（视频）](https://www.youtube.com/watch?v=B7hVxCmfPtM&index=4&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb)
+- [ ] [CS 61B Lecture 24：优先队列（视频）](https://archive.org/details/ucberkeley_webcast_yIUFT6AKBGE)
+- [ ] [线性时间构建堆（大顶堆）](https://www.youtube.com/watch?v=MiyLo8adrWw)
+- [ ] [[复习] 13 分钟了解堆（视频）](https://www.youtube.com/playlist?list=PL9xmBV_5YoZNsyqgPW-DNwUeT8F8uhWc6)
+- [ ] 实现一个大顶堆：
+    - [ ] insert
+    - [ ] sift_up —— 用于插入元素
+    - [ ] get_max —— 返回最大值但不移除元素
+    - [ ] get_size() —— 返回存储的元素数量
+    - [ ] is_empty() —— 若堆为空则返回 true
+    - [ ] extract_max —— 返回最大值并移除
+    - [ ] sift_down —— 用于获取最大值元素
+    - [ ] remove(i) —— 删除指定索引的元素
+    - [ ] heapify —— 构建堆，用于堆排序
+    - [ ] heap_sort() —— 拿到一个未排序的数组，然后使用大顶堆或者小顶堆进行就地排序
 
 ## 排序（Sorting）
 
