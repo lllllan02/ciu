@@ -202,7 +202,10 @@ title: Coding Interview University 的学习记录
 
 ### 堆（Heap） / 优先级队列（Priority Queue） / 二叉堆（Binary Heap）
 
-- 以树形结构可视化，但通常在存储上是线性的（数组、链表）
+- [x] [百度百科 - 完全二叉树](https://baike.baidu.com/item/%E5%AE%8C%E5%85%A8%E4%BA%8C%E5%8F%89%E6%A0%91/7773232) (2026-06-08)
+- [x] [OI Wiki - 堆简介](https://oi-wiki.org/ds/heap/) (2026-06-08)
+- [x] [OI Wiki - 二叉堆](https://oi-wiki.org/ds/binary-heap/) (2026-06-08)
+- [x] [Hello Algo - 堆](https://www.hello-algo.com/chapter_heap/heap/) (2026-06-08)
 - [ ] [堆（Heap）](https://en.wikipedia.org/wiki/Heap_(data_structure))
 - [ ] [堆简介（视频）](https://www.coursera.org/lecture/data-structures/introduction-2OpTs)
 - [ ] [二叉树（视频）](https://www.coursera.org/learn/data-structures/lecture/GRV2q/binary-trees)
@@ -217,17 +220,8 @@ title: Coding Interview University 的学习记录
 - [ ] [CS 61B Lecture 24：优先队列（视频）](https://archive.org/details/ucberkeley_webcast_yIUFT6AKBGE)
 - [ ] [线性时间构建堆（大顶堆）](https://www.youtube.com/watch?v=MiyLo8adrWw)
 - [ ] [[复习] 13 分钟了解堆（视频）](https://www.youtube.com/playlist?list=PL9xmBV_5YoZNsyqgPW-DNwUeT8F8uhWc6)
-- [ ] 实现一个大顶堆：
-    - [ ] insert
-    - [ ] sift_up —— 用于插入元素
-    - [ ] get_max —— 返回最大值但不移除元素
-    - [ ] get_size() —— 返回存储的元素数量
-    - [ ] is_empty() —— 若堆为空则返回 true
-    - [ ] extract_max —— 返回最大值并移除
-    - [ ] sift_down —— 用于获取最大值元素
-    - [ ] remove(i) —— 删除指定索引的元素
-    - [ ] heapify —— 构建堆，用于堆排序
-    - [ ] heap_sort() —— 拿到一个未排序的数组，然后使用大顶堆或者小顶堆进行就地排序
+
+> - [x] [实现大顶堆](/data-structure/max-heap) (2026-06-08)
 
 ## 排序（Sorting）
 
