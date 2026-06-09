@@ -255,6 +255,13 @@ plugins:
     enabled: true
     options: {}
     order: 50
+  - source: github:quartz-lib/sort-by-order
+    enabled: true
+    options:
+      orderKey: order
+      foldersFirst: true
+      missingOrderPlacement: end
+    order: 60
 layout:
   groups:
     toolbar:

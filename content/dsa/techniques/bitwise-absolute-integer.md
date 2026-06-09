@@ -1,5 +1,6 @@
 ---
 title: 按位求绝对值
+order: 2
 ---
 
 > 原文: http://bits.stephan-brumme.com/absInteger.html

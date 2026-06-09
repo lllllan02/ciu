@@ -1,5 +1,6 @@
 ---
 title: 线性时间构建堆
+order: 5
 ---
 
 > 源码: [堆排序 `heapify` 建堆](https://github.com/lllllan02/ciu/tree/master/code/heap-sort)、[大顶堆 `push` 建堆](https://github.com/lllllan02/ciu/tree/master/code/max-heap)

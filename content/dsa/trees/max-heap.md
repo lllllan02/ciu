@@ -1,5 +1,6 @@
 ---
 title: 大顶堆
+order: 3
 ---
 
 > 源码: https://github.com/lllllan02/ciu/tree/master/code/max-heap

@@ -1,5 +1,6 @@
 ---
 title: 哈希表
+order: 5
 ---
 
 > 源码: https://github.com/lllllan02/ciu/tree/master/code/hash-table

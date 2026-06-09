@@ -1,6 +1,7 @@
 ---
 title: Coding Interview University 的学习记录
 description: 基于 Coding Interview University 的面试准备学习路线与进度记录。
+order: 0
 ---
 
 > 原仓库：[Coding Interview University](https://github.com/jwasham/coding-interview-university)

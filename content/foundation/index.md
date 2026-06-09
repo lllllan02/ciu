@@ -1,6 +1,7 @@
 ---
 title: 基础理论
 description: 算法复杂度分析与 Big-O 记号。
+order: 1
 ---
 
 ## 算法复杂度 / Big-O

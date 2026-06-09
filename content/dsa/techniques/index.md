@@ -1,6 +1,7 @@
 ---
 title: 算法技巧
 description: 二分查找、按位运算。
+order: 2
 ---
 
 ### 二分查找（Binary search）

@@ -1,5 +1,6 @@
 ---
 title: 队列
+order: 4
 ---
 
 > 源码: [数组实现](https://github.com/lllllan02/ciu/tree/master/code/array-queue)、[链表实现](https://github.com/lllllan02/ciu/tree/master/code/linked-list-queue)

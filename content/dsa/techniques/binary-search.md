@@ -1,5 +1,6 @@
 ---
 title: 二分查找
+order: 1
 ---
 
 > 源码: https://github.com/lllllan02/ciu/tree/master/code/binary-search

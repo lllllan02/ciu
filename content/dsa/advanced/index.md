@@ -1,6 +1,7 @@
 ---
 title: 高级算法
 description: 递归、回溯与动态规划。
+order: 6
 ---
 
 ### 递归（Recursion）

@@ -1,5 +1,6 @@
 ---
 title: 平衡二叉搜索树
+order: 2
 ---
 
 > 源码: https://github.com/lllllan02/ciu/tree/master/code/balanced_bst

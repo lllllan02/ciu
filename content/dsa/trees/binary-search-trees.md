@@ -1,5 +1,6 @@
 ---
 title: 二叉搜索树
+order: 1
 ---
 
 > 源码: https://github.com/lllllan02/ciu/tree/master/code/binary-search-tree
