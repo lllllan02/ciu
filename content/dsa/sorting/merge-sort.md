@@ -7,19 +7,22 @@ order: 1
 >
 > 源码（递归）: https://github.com/lllllan02/ciu/tree/master/code/merge-sort-recur
 >
+> 源码（链表）: https://github.com/lllllan02/ciu/tree/master/code/merge-sort-linked-list
+>
 > 参考: [菜鸟教程 - 归并排序](https://www.runoob.com/w3cnote/merge-sort.html)
 
-归并排序（Merge Sort）是一种 **分治** 比较排序算法：将数组分成两半分别排序后 **合并** 两个有序子数组。时间复杂度稳定为 $O(n \log n)$，额外空间通常为 $O(n)$，是 **稳定** 排序。
+归并排序（Merge Sort）是一种 **分治** 比较排序算法：将序列分成两半分别排序后 **合并** 两个有序子序列。时间复杂度稳定为 $O(n \log n)$，是 **稳定** 排序。数组实现通常需要 $O(n)$ 辅助缓冲区；链表实现通过改指针完成合并，无需额外数组，是对链表做通用排序的推荐方式。
 
-合并时使用 `<=` 取左段元素，保证相等元素的相对顺序不变。两种写法仅在分治方式上不同，合并逻辑一致。
+合并时使用 `<=` 取左段元素，保证相等元素的相对顺序不变。数组的两种写法仅在分治方式上不同，合并逻辑一致。
 
 ## API
 
 | 函数 | 说明 |
 | :--- | :--- |
 | `merge_sort(arr, len)` | 对 `arr[0..len-1]` 升序排序 |
+| `merge_sort(head)` | 对链表升序排序，返回排序后的头节点 |
 
-## 两种实现
+## 数组：两种实现
 
 | | 自顶向下（递归） | 自底向上（迭代） |
 | :--- | :--- | :--- |
@@ -95,19 +98,75 @@ if (src != arr) {
 }
 ```
 
+## 链表实现
+
+链表版沿用自顶向下分治，但切分与合并都通过改指针完成，不需要 $O(n)$ 辅助数组。
+
+1. **基准**：若链表为空或仅一个节点，已有序，直接返回 `head`。
+2. **切分**：快慢指针找到中点，`prev->next = NULL` 断开前后两段。
+3. **递归**：分别对前后两段调用 `merge_sort`。
+4. **合并**：双指针按值大小拼接节点，返回新头节点。
+
+```c
+static Node *merge(Node *left, Node *right) {
+    Node dummy = {0, NULL};
+    Node *tail = &dummy;
+
+    while (left && right) {
+        if (left->data <= right->data) {
+            tail->next = left;
+            left = left->next;
+        } else {
+            tail->next = right;
+            right = right->next;
+        }
+        tail = tail->next;
+    }
+    tail->next = left ? left : right;
+    return dummy.next;
+}
+
+Node *merge_sort(Node *head) {
+    if (!head || !head->next) {
+        return head;
+    }
+
+    Node *second = split(head);
+    head = merge_sort(head);
+    second = merge_sort(second);
+    return merge(head, second);
+}
+```
+
+快慢指针切分示意：
+
+```c
+static Node *split(Node *head) {
+    Node *slow = head, *fast = head, *prev = NULL;
+
+    while (fast && fast->next) {
+        prev = slow;
+        slow = slow->next;
+        fast = fast->next->next;
+    }
+    prev->next = NULL;
+    return slow;
+}
+```
+
 ## 复杂度分析
 
-设数组长度为 $n$。
+设序列长度为 $n$。
 
-| 项目 | 复杂度 | 说明 |
+| 项目 | 数组（递归 / 迭代） | 链表 |
 | :--- | :--- | :--- |
-| **时间** | $O(n \log n)$ | 递归深度或合并轮数为 $O(\log n)$，每层 / 每轮 $O(n)$ 合并 |
-| **额外空间** | $O(n)$ | 一块辅助缓冲区 |
-| **稳定性** | 稳定 | 合并时相等元素优先取左段 |
+| **时间** | $O(n \log n)$ | $O(n \log n)$ |
+| **额外空间** | $O(n)$ 辅助缓冲区 | $O(\log n)$ 递归栈；合并原地改指针 |
+| **稳定性** | 稳定 | 稳定 |
 
 ## 测试
 
-两种实现共用同一套测试用例，覆盖基本乱序、已有序、逆序、重复元素，以及空数组、单元素、含负数等边界情况。
+数组两种实现与链表实现共用同一套测试场景，覆盖基本乱序、已有序、逆序、重复元素，以及空序列、单元素、含负数等边界情况。
 
 ```bash
 cd code/merge-sort-recur
@@ -115,6 +174,10 @@ gcc -Wall -Wextra -std=c11 -o main main.c
 ./main
 
 cd ../merge-sort
+gcc -Wall -Wextra -std=c11 -o main main.c
+./main
+
+cd ../merge-sort-linked-list
 gcc -Wall -Wextra -std=c11 -o main main.c
 ./main
 ```
