@@ -136,8 +136,6 @@ plugins:
     enabled: true
   - source: github:quartz-community/content-page
     enabled: true
-  - source: github:quartz-community/folder-page
-    enabled: true
   - source: github:quartz-community/tag-page
     enabled: true
   - source: github:quartz-community/explorer
@@ -252,6 +250,10 @@ plugins:
       containerClass: full-width-tables
       tableLayout: auto
       stretchToViewport: false
+    order: 50
+  - source: github:quartz-lib/index-content-page
+    enabled: true
+    options: {}
     order: 50
 layout:
   groups:

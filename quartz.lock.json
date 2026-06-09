@@ -121,12 +121,6 @@
       "commit": "85842d5c15f937a3d1a02c45accee27118146d73",
       "installedAt": "2026-05-24T15:36:16.980Z"
     },
-    "folder-page": {
-      "source": "github:quartz-community/folder-page",
-      "resolved": "https://github.com/quartz-community/folder-page.git",
-      "commit": "a538b8e548a0215568942a3d94b042010a86d66b",
-      "installedAt": "2026-05-24T15:36:16.992Z"
-    },
     "footer": {
       "source": "github:quartz-community/footer",
       "resolved": "https://github.com/quartz-community/footer.git",
@@ -156,6 +150,12 @@
       "resolved": "https://github.com/quartz-community/hard-line-breaks.git",
       "commit": "0d448f38a24c568c5539ff2cd57d813293430ccd",
       "installedAt": "2026-05-24T15:36:17.005Z"
+    },
+    "index-content-page": {
+      "source": "github:quartz-lib/index-content-page",
+      "resolved": "https://github.com/quartz-lib/index-content-page.git",
+      "commit": "16ebbce935843ecc2ab84a9bf5b9ec77fddfc147",
+      "installedAt": "2026-06-09T03:26:01.176Z"
     },
     "latex": {
       "source": "github:quartz-community/latex",
