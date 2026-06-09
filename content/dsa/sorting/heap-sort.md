@@ -1,6 +1,6 @@
 ---
 title: 堆排序
-order: 4
+order: 2
 ---
 
 > 源码: https://github.com/lllllan02/ciu/tree/master/code/heap-sort

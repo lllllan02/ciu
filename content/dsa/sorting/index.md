@@ -4,7 +4,7 @@ description: 比较排序、稳定性与线性时间排序。
 order: 4
 ---
 
-排序是把一组元素按键值大小重排成有序序列的操作。常见基于比较的算法在平均与最坏时间、额外空间、是否**稳定**以及适用容器（数组还是链表）上各有取舍；面试里既要能讲清思路与复杂度，也要能手写归并、快排等核心实现。下面按算法分类展开；堆排序的实现与复杂度分析见 [树](/dsa/trees) 中 [堆](/dsa/trees#堆heap--优先级队列priority-queue--二叉堆binary-heap) 一节。
+排序是把一组元素按键值大小重排成有序序列的操作。常见基于比较的算法在平均与最坏时间、额外空间、是否**稳定**以及适用容器（数组还是链表）上各有取舍；面试里既要能讲清思路与复杂度，也要能手写归并、快排等核心实现。下面按算法分类展开。
 
 ### 稳定性与比较排序基础
 
@@ -34,7 +34,7 @@ order: 4
 - [ ] [使用外部数组（Python 语言）](https://github.com/jwasham/practice-python/blob/master/merge_sort/merge_sort.py)
 - [ ] [对原数组直接排序（C++）](https://github.com/jwasham/practice-cpp/blob/master/merge_sort/merge_sort.cc)
 
-> - [ ] 动手实现：平均和最差情况的时间复杂度为 O(n log n)。
+> - [x] [实现归并排序](/dsa/sorting/merge-sort) (2026-06-09)
 
 ### 快速排序
 
@@ -53,11 +53,11 @@ order: 4
 
 ### 堆排序
 
-利用堆结构反复取出极值。时间 $O(n \log n)$，原地排序，**不稳定**；实现与复杂度分析见 [树](/dsa/trees) 中 [堆的数据结构](/dsa/trees#堆heap--优先级队列priority-queue--二叉堆binary-heap) 部分。
+利用堆结构反复取出极值。时间 $O(n \log n)$，原地排序，**不稳定**；堆数据结构见 [树](/dsa/trees) 中 [堆](/dsa/trees#堆heap--优先级队列priority-queue--二叉堆binary-heap) 一节。
 
 - [ ] [Heap sort in 4 minutes (video)](https://youtu.be/2DmK_H7IdTo)
 
-> - [x] [实现堆排序](/dsa/trees/heap-sort) (2026-06-09)
+> - [x] [实现堆排序](/dsa/sorting/heap-sort) (2026-06-09)
 
 ### 插入排序
 

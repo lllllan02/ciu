@@ -68,5 +68,5 @@ order: 3
 - [ ] [[复习] 13 分钟了解堆（视频）](https://www.youtube.com/playlist?list=PL9xmBV_5YoZNsyqgPW-DNwUeT8F8uhWc6)
 
 > - [x] [实现大顶堆](/dsa/trees/max-heap) (2026-06-08)
-> - [x] [实现堆排序](/dsa/trees/heap-sort) (2026-06-09)
+> - [x] [实现堆排序](/dsa/sorting/heap-sort) (2026-06-09)
 > - [x] [线性时间构建堆](/dsa/trees/build-heap) (2026-06-09)
