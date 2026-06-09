@@ -3,10 +3,26 @@ title: 数据结构与算法
 description: 面试核心：线性结构、树、图、排序与高级算法。
 ---
 
-线性结构（数组、链表、栈、队列）与基于哈希的映射是后续树、图和算法题的基础；建议按下面顺序学习。
+按「线性结构 → 算法技巧 → 树 → 排序 → 图 → 高级算法」的顺序学习；每一类都包含概念说明、学习资源与动手实现。
 
+## 学习路线
 
-## 数组（Arrays）
+| 部分 | 说明 |
+| :--- | :--- |
+| [线性结构](#线性结构) | 数组、链表、栈、队列、哈希表 |
+| [算法技巧](#算法技巧) | 二分查找、按位运算 |
+| [树](#树) | 树遍历、BST、堆与优先级队列 |
+| [排序](#排序) | 比较排序、稳定性与线性时间排序 |
+| [图](#图) | 表示法、BFS/DFS、最短路与最小生成树 |
+| [高级算法](#高级算法) | 递归、回溯与动态规划 |
+
+---
+
+## 线性结构
+
+线性结构（数组、链表、栈、队列）与基于哈希的映射是后续树、图和算法题的基础。
+
+### 数组（Arrays）
 
 数组把元素放在**连续内存**里，用下标可在 $O(1)$ 时间内随机访问任意位置；在末尾增删通常也很快，但在中间插入或删除需要挪动后面的元素，一般是 $O(n)$。固定长度的数组容量写死；**动态数组**在元素变多时自动扩容（常见做法是容量翻倍），是多数语言里 `vector`、列表等容器的底层思路。
 
@@ -18,14 +34,14 @@ description: 面试核心：线性结构、树、图、排序与高级算法。
 
 > - [x] [实现动态数组](/dsa/arrays) (2026-02-01)
 
-## 链表（Linked Lists）
+### 链表（Linked Lists）
 
 链表由一个个**节点**串成，每个节点存数据和指向下一个节点的指针；元素在内存里不必连续。已知位置时，在头尾或中间插入、删除往往只需改指针，是 $O(1)$；但按序号访问要从头往后走，是 $O(n)$。**单向链表**只指向前驱；**双向链表**多一个指向前节点的指针，便于从尾部往前删改，代价是每个节点多占一点空间。
 
 - [x] [Harvard CS50 - 链表（视频）](https://www.youtube.com/watch?v=2T-A_GFuoTo&t=650s) (2026-02-07)
 - [x] [Michael Sambol - 4 分钟了解链表（视频）](https://youtu.be/F8AbOfQwl1c) (2026-02-28)
 - [x] [MyCodeSchool - 链表 C 语言实现（视频）](https://www.youtube.com/watch?v=QN6FPiD0Gzo) 不是整个视频，只是关于 Node 结构和内存分配的部分。(2026-02-28)
-- [x] [Steve Summit - 指向指针的指针（文章）](https://www.eskimo.com/~scs/cclass/int/sx8.html) 的确：你需要关于“指向指针的指针”的相关知识：（因为当你传递一个指针到一个函数时，该函数可能会改变指针所指向的地址）该页只是为了让你了解“指向指针的指针”这一概念。但我并不推荐这种链式遍历的风格。因为，这种风格的代码，其可读性和可维护性太低。(2026-02-28)
+- [x] [Steve Summit - 指向指针的指针（文章）](https://www.eskimo.com/~scs/cclass/int/sx8.html) 的确：你需要关于"指向指针的指针"的相关知识：（因为当你传递一个指针到一个函数时，该函数可能会改变指针所指向的地址）该页只是为了让你了解"指向指针的指针"这一概念。但我并不推荐这种链式遍历的风格。因为，这种风格的代码，其可读性和可维护性太低。(2026-02-28)
 - [ ] [UC Berkeley CS61B - 链表 1（视频）](https://archive.org/details/ucberkeley_webcast_htzJdKoEmO0)
 - [ ] [UC Berkeley CS61B - 链表 2（视频）](https://archive.org/details/ucberkeley_webcast_-c4I3gFYe3w)
 - [ ] [UC San Diego - 单链表（视频）](https://www.coursera.org/lecture/data-structures/singly-linked-lists-kHhgK)
@@ -35,16 +51,16 @@ description: 面试核心：线性结构、树、图、排序与高级算法。
 
 > - [x] [实现单向链表](/dsa/linked-lists) (2026-02-28)
 
-## 堆栈（Stack）
+### 堆栈（Stack）
 
 堆栈是一种 **后进先出（LIFO）** 的线性结构：只在同一端压入（push）和弹出（pop），查看栈顶也是 $O(1)$。用数组或链表都能实现，数组版更简单。常见于函数调用栈、括号匹配、DFS、撤销操作等「先处理最近压入的」场景。
 
 - [x] [Michael Sambol - Stacks in 3 minutes](https://youtu.be/KcT3aVgrrpU) (2026-03-01)
 - [ ] [UC San Diego - 堆栈](https://www.coursera.org/learn/data-structures/lecture/UdKzQ/stacks)
 
-可以不实现，因为使用数组来实现是微不足道的事
+可以不实现，因为使用数组来实现是微不足道的事。
 
-## 队列（Queue）
+### 队列（Queue）
 
 队列是一种 **先进先出（FIFO）** 的线性结构：从一端入队（enqueue）、另一端出队（dequeue），两端操作都是 $O(1)$。与堆栈相对，适合 BFS、任务调度、消息缓冲等「先来的先处理」场景。用数组实现时常配合**循环队列**，避免频繁搬移元素；用链表实现则头尾各维护指针即可。
 
@@ -54,7 +70,7 @@ description: 面试核心：线性结构、树、图、排序与高级算法。
 
 > - [x] [实现队列](/dsa/queue) (2026-03-04)
 
-## 哈希表（Hash table）
+### 哈希表（Hash table）
 
 哈希表用**哈希函数**把键映射到桶下标，在理想情况下插入、查找、删除的平均时间都是 $O(1)$。不同键可能落到同一位置（冲突），常见处理方式是**链式法**（每个桶挂链表）或**开放寻址**（在表里探测下一个空位）。语言里的 `dict` / `map`、缓存、计数表等都依赖这一结构；负载因子过高时要扩容并 rehash。
 
@@ -72,14 +88,18 @@ description: 面试核心：线性结构、树、图、排序与高级算法。
 - [ ] [数据结构（视频）](https://www.coursera.org/learn/data-structures/home/week/4)
 - [ ] [电话簿问题（视频）](https://www.coursera.org/lecture/data-structures/phone-book-problem-NYZZP)
 
-### 分布式哈希表
+#### 分布式哈希表
 
 - [ ] [Dropbox 中的即时上传和存储优化（视频）](https://www.coursera.org/lecture/data-structures/instant-uploads-and-storage-optimization-in-dropbox-DvaIb)
 - [ ] [分布式哈希表（视频）](https://www.coursera.org/lecture/data-structures/distributed-hash-tables-tvH8H)
 
 > - [x] [实现链式哈希表](/dsa/hash-tables) (2026-06-01)
 
-## 二分查找（Binary search）
+---
+
+## 算法技巧
+
+### 二分查找（Binary search）
 
 二分查找在 **已排序** 的序列上工作：每次取中间元素与目标比较，根据大小关系丢弃左半或右半，直到找到或区间为空。每轮比较都能排除约一半元素，时间复杂度 $O(\log n)$；用循环实现时额外空间只需 $O(1)$。这是分治思想的典型应用，也是找边界、最小满足条件等许多算法题的基础模板。
 
@@ -92,16 +112,16 @@ description: 面试核心：线性结构、树、图、排序与高级算法。
 
 > - [x] [实现二分查找](/dsa/binary-search) (2026-06-02)
 
-## 按位运算（Bitwise operations）
+### 按位运算（Bitwise operations）
 
 按位运算在底层表示、掩码、权限标志和性能优化里很常见；面试里常考 2 的幂、符号位与经典 bit trick。下面按「进制与速查 → 运算符 → 补码 → 技巧 → 置位与交换」顺序展开。
 
-### 2 的幂与速查
+#### 2 的幂与速查
 
 - [x] [OI Wiki - 进位制](https://oi-wiki.org/math/numeral-sys/base/) (2026-06-04)
 - [ ] [Bits 速查表](https://github.com/jwasham/coding-interview-university/blob/main/extras/cheat%20sheets/bits-cheat-sheet.pdf) ── 你需要知道大量 2 的幂数值（从 2^1 到 2^16 及 2^32）
 
-### 位运算符
+#### 位运算符
 
 好好理解位操作符的含义：&、|、^、~、>>、<<
 
@@ -117,31 +137,35 @@ description: 面试核心：线性结构、树、图、排序与高级算法。
 - [ ] [练习位操作](https://pconrad.github.io/old_pconrad_cs16/topics/bitOps/)
 - [x] [绝对整型（Absolute Integer）](/dsa/bitwise-absolute-integer) (2026-06-03)
 
-### 补数与补码
+#### 补数与补码
 
 - [x] [菜鸟教程 - 原码、反码、补码](https://www.runoob.com/w3cnote/sign-magnitude.html) (2026-06-04)
 - [ ] [补数（1s Complement）](https://en.wikipedia.org/wiki/Ones%27_complement)
 - [ ] [补码（2s Complement）](https://en.wikipedia.org/wiki/Two%27s_complement)
 - [ ] [二进制：利 & 弊（为什么我们要使用补码）（视频）](https://www.youtube.com/watch?v=lKTsv6iVxV4)
 
-### 位运算技巧
+#### 位运算技巧
 
 - [ ] [Bithacks](https://graphics.stanford.edu/~seander/bithacks.html)
 - [ ] [位操作技巧（Bit Hacks）（视频）](https://www.youtube.com/watch?v=ZusiKXcz_ac)
 
-### 计算置位（Set Bits）
+#### 计算置位（Set Bits）
 
 - [ ] [计算一个字节中置位（Set Bits）的四种方式（视频）](https://youtu.be/Hzuzo9NJrlc)
 - [ ] [计算比特位](https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetKernighan)
 - [ ] [如何在一个 32 位的整型中计算置位（Set Bits）的数量](http://stackoverflow.com/questions/109023/how-to-count-the-number-of-set-bits-in-a-32-bit-integer)
 
-### 交换
+#### 交换
 
 - [ ] [交换（Swap）](http://bits.stephan-brumme.com/swap.html)
 
-## 树（Trees）
+---
 
-树是一种**层次化**的非线性结构：节点通过边连接，有且仅有一个根，除根外每个节点只有一个父节点，且不存在环。树是文件系统、DOM、表达式解析以及堆、BST 等许多数据结构的基础；下面先掌握树的基本概念与遍历，再深入二叉搜索树及其平衡变种。
+## 树
+
+树是一种**层次化**的非线性结构：节点通过边连接，有且仅有一个根，除根外每个节点只有一个父节点，且不存在环。树是文件系统、DOM、表达式解析以及堆、BST 等许多数据结构的基础。
+
+### 树基础（Trees）
 
 树由**节点**和**边**组成：从根到任意节点有唯一路径。在**二叉树**中，每个节点最多有左、右两个孩子。访问所有节点常用 **BFS（广度优先 / 层序）** 或 **DFS（深度优先：先序、中序、后序）**；二者也是图遍历与大量面试题的基础模板，遍历一棵含 $n$ 个节点的树时间复杂度为 $O(n)$。
 
@@ -154,7 +178,7 @@ description: 面试核心：线性结构、树、图、排序与高级算法。
 - [ ] [[复习] 4 分钟内的深度优先搜索（视频）](https://youtu.be/Urx87-NMm6c)
 - [ ] [[复习]11 分钟内的树遍历（播放列表）（视频）](https://www.youtube.com/playlist?list=PL9xmBV_5YoZO1JC2RgEi04nLy6D-rKk6b)
 
-## 二叉查找树（Binary search trees）
+### 二叉查找树（Binary search trees）
 
 **二叉搜索树（BST）** 在二叉树基础上满足 BST 性质：左子树所有键值**小于**当前节点，右子树**大于**当前节点，**中序遍历**得到升序序列。树较平衡时，查找、插入、删除的平均时间均为 $O(\log n)$；若按有序顺序插入会退化为链表，最坏为 $O(n)$。语言里的 `std::map` / `TreeMap` 等有序容器都建立在这一思想上，工程实现通常配合 AVL、红黑树等**平衡树**维持高度。
 
@@ -177,7 +201,9 @@ description: 面试核心：线性结构、树、图、排序与高级算法。
 > - [x] [实现二叉搜索树](/dsa/binary-search-trees) (2026-06-05)
 > - [x] [实现平衡二叉搜索树](/dsa/balanced-binary-search-trees) (2026-06-08)
 
-## 堆（Heap） / 优先级队列（Priority Queue） / 二叉堆（Binary Heap）
+### 堆（Heap） / 优先级队列（Priority Queue） / 二叉堆（Binary Heap）
+
+**堆**是一棵满足堆性质的完全二叉树：大顶堆中父节点不小于子节点，小顶堆反之。用数组存储时，父子下标有固定换算关系，插入与删除极值可在 $O(\log n)$ 内完成；**优先级队列**的底层通常就是堆。堆排序、Top-K、Dijkstra 等场景都依赖这一结构。
 
 - [x] [百度百科 - 完全二叉树](https://baike.baidu.com/item/%E5%AE%8C%E5%85%A8%E4%BA%8C%E5%8F%89%E6%A0%91/7773232) (2026-06-08)
 - [x] [OI Wiki - 堆简介](https://oi-wiki.org/ds/heap/) (2026-06-08)
@@ -203,6 +229,8 @@ description: 面试核心：线性结构、树、图、排序与高级算法。
 > - [x] [实现大顶堆](/dsa/max-heap) (2026-06-08)
 > - [x] [实现堆排序](/dsa/heap-sort) (2026-06-09)
 > - [x] [线性时间构建堆](/dsa/build-heap) (2026-06-09)
+
+---
 
 ## 排序（Sorting）
 
@@ -314,109 +342,128 @@ description: 面试核心：线性结构、树、图、排序与高级算法。
 
 总结一下，这是 [15 种排序算法](https://www.youtube.com/watch?v=kPRA0W1kECg) 的可视化表示。如果你需要有关此主题的更多详细信息，请参阅「[一些主题的额外内容](/optional#一些主题的额外内容)」中的「排序」部分。
 
+---
+
 ## 图（Graphs）
 
-图表可以用来表示计算机科学中的许多问题，所以这一部分很长，就像树和排序一样。
+图用来表示节点（顶点）与边之间的关系，是计算机科学中许多问题的自然建模方式；本节内容较多，建议先掌握表示法与遍历，再深入最短路与最小生成树。
 
-- 笔记:
-    - 有 4 种基本方式在内存里表示一个图:
-        - 对象和指针
-        - 邻接矩阵
-        - 邻接表
-        - 邻接图
-    - 熟悉以上每一种图的表示法，并了解各自的优缺点
-    - 广度优先搜索和深度优先搜索：知道它们的计算复杂度和设计上的权衡以及如何用代码实现它们
-    - 遇到一个问题时，首先尝试基于图的解决方案，如果没有再去尝试其他的。
+### 核心概念
 
-- MIT（视频）：
-    - [广度优先搜索](https://www.youtube.com/watch?v=s-CYnVz-uh4&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb&index=13)
-    - [深度优先搜索](https://www.youtube.com/watch?v=AfSk24UTFS8&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb&index=14)
+- 有 4 种基本方式在内存里表示一个图：
+    - 对象和指针
+    - 邻接矩阵
+    - 邻接表
+    - 邻接图
+- 熟悉以上每一种图的表示法，并了解各自的优缺点
+- 广度优先搜索和深度优先搜索：知道它们的计算复杂度和设计上的权衡以及如何用代码实现它们
+- 遇到一个问题时，首先尝试基于图的解决方案，如果没有再去尝试其他的
 
-- [ ] Skiena 教授的课程 - 很不错的介绍:
-    - [ ] [CSE373 2012 - 课程 11 - 图的数据结构（视频）](https://www.youtube.com/watch?v=OiXxhDrFruw&list=PLOtl7M3yp-DV69F32zdK7YJcNXpTunF2b&index=11)
-    - [ ] [CSE373 2012 - 课程 12 - 广度优先搜索（视频）](https://www.youtube.com/watch?v=g5vF8jscteo&list=PLOtl7M3yp-DV69F32zdK7YJcNXpTunF2b&index=12)
-    - [ ] [CSE373 2012 - 课程 13 - 图的算法（视频）](https://www.youtube.com/watch?v=S23W6eTcqdY&list=PLOtl7M3yp-DV69F32zdK7YJcNXpTunF2b&index=13)
-    - [ ] [CSE373 2012 - 课程 14 - 图的算法 (1)（视频）](https://www.youtube.com/watch?v=WitPBKGV0HY&index=14&list=PLOtl7M3yp-DV69F32zdK7YJcNXpTunF2b)
-    - [ ] [CSE373 2012 - 课程 15 - 图的算法 (2)（视频）](https://www.youtube.com/watch?v=ia1L30l7OIg&index=15&list=PLOtl7M3yp-DV69F32zdK7YJcNXpTunF2b)
-    - [ ] [CSE373 2012 - 课程 16 - 图的算法 (3)（视频）](https://www.youtube.com/watch?v=jgDOQq6iWy8&index=16&list=PLOtl7M3yp-DV69F32zdK7YJcNXpTunF2b)
+### MIT 课程
 
-- [ ] 图 (复习和其他):
+- [广度优先搜索](https://www.youtube.com/watch?v=s-CYnVz-uh4&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb&index=13)
+- [深度优先搜索](https://www.youtube.com/watch?v=AfSk24UTFS8&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb&index=14)
 
-    - [ ] [6.006 单源最短路径问题（视频）](https://www.youtube.com/watch?v=Aa2sqUhIn-E&index=15&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb)
-    - [ ] [6.006 Dijkstra 算法（视频）](https://www.youtube.com/watch?v=NSHizBK9JD8&t=1731s&ab_channel=MITOpenCourseWare)
-    - [ ] [6.006 Bellman-Ford 算法（视频）](https://www.youtube.com/watch?v=f9cVS_URPc0&ab_channel=MITOpenCourseWare)
-    - [ ] [6.006 加速 Dijkstra 算法（视频）](https://www.youtube.com/watch?v=CHvQ3q_gJ7E&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb&index=18)
-    - [ ] [Aduni：图算法 I - 拓扑排序，最小生成树，Prim 算法 - 讲座 6（视频）](https://www.youtube.com/watch?v=i_AQT_XfvD8&index=6&list=PLFDnELG9dpVxQCxuD-9BSy2E7BWY3t5Sm)
-    - [ ] [Aduni：图算法 II - DFS，BFS，Kruskal 算法，Union Find 数据结构 - 讲座 7（视频）](https://www.youtube.com/watch?v=ufj5_bppBsA&list=PLFDnELG9dpVxQCxuD-9BSy2E7BWY3t5Sm&index=7)
-    - [ ] [Aduni：图算法 III：最短路径 - 讲座 8（视频）](https://www.youtube.com/watch?v=DiedsPsMKXc&list=PLFDnELG9dpVxQCxuD-9BSy2E7BWY3t5Sm&index=8)
-    - [ ] [Aduni：图算法 IV：几何算法入门 - 讲座 9（视频）](https://www.youtube.com/watch?v=XIAQRlNkJAw&list=PLFDnELG9dpVxQCxuD-9BSy2E7BWY3t5Sm&index=9)
-    - [ ] [CS 61B 2014：加权图（视频）](https://archive.org/details/ucberkeley_webcast_zFbq8vOZ_0k)
-    - [ ] [贪婪算法：最小生成树（视频）](https://www.youtube.com/watch?v=tKwnms5iRBU&index=16&list=PLUl4u3cNGP6317WaSNfmCvGym2ucw3oGp)
-    - [ ] [强连通分量 Kosaraju 算法图算法（视频）](https://www.youtube.com/watch?v=RpgcYiky7uw)
-    - [ ] [[复习] 最短路径算法（播放列表）16 分钟（视频）](https://www.youtube.com/playlist?list=PL9xmBV_5YoZO-Y-H3xIC9DGSfVYJng9Yw)
-    - [ ] [[复习] 最小生成树（播放列表）4 分钟（视频）](https://www.youtube.com/playlist?list=PL9xmBV_5YoZObEi3Hf6lmyW-CBfs7nkOV)
+### Skiena 课程
 
-- 完整的 Coursera 课程:
-    - [ ] [图的算法（视频）](https://www.coursera.org/learn/algorithms-on-graphs/home/welcome)
+- [ ] [CSE373 2012 - 课程 11 - 图的数据结构（视频）](https://www.youtube.com/watch?v=OiXxhDrFruw&list=PLOtl7M3yp-DV69F32zdK7YJcNXpTunF2b&index=11)
+- [ ] [CSE373 2012 - 课程 12 - 广度优先搜索（视频）](https://www.youtube.com/watch?v=g5vF8jscteo&list=PLOtl7M3yp-DV69F32zdK7YJcNXpTunF2b&index=12)
+- [ ] [CSE373 2012 - 课程 13 - 图的算法（视频）](https://www.youtube.com/watch?v=S23W6eTcqdY&list=PLOtl7M3yp-DV69F32zdK7YJcNXpTunF2b&index=13)
+- [ ] [CSE373 2012 - 课程 14 - 图的算法 (1)（视频）](https://www.youtube.com/watch?v=WitPBKGV0HY&index=14&list=PLOtl7M3yp-DV69F32zdK7YJcNXpTunF2b)
+- [ ] [CSE373 2012 - 课程 15 - 图的算法 (2)（视频）](https://www.youtube.com/watch?v=ia1L30l7OIg&index=15&list=PLOtl7M3yp-DV69F32zdK7YJcNXpTunF2b)
+- [ ] [CSE373 2012 - 课程 16 - 图的算法 (3)（视频）](https://www.youtube.com/watch?v=jgDOQq6iWy8&index=16&list=PLOtl7M3yp-DV69F32zdK7YJcNXpTunF2b)
 
-- 我会实现:
-    - [ ] DFS 邻接表 (递归)
-    - [ ] DFS 邻接表 (栈迭代)
-    - [ ] DFS 邻接矩阵 (递归)
-    - [ ] DFS 邻接矩阵 (栈迭代)
-    - [ ] BFS 邻接表
-    - [ ] BFS 邻接矩阵
-    - [ ] 单源最短路径问题 (Dijkstra)
-    - [ ] 最小生成树
-    - 基于 DFS 的算法 (根据上文 Aduni 的视频):
-        - [ ] 检查环 (我们会先检查是否有环存在以便做拓扑排序)
-        - [ ] 拓扑排序
-        - [ ] 计算图中的连通分支
-        - [ ] 列出强连通分量
-        - [ ] 检查双向图
+### 复习与经典算法
 
-## 递归（Recursion）
+- [ ] [6.006 单源最短路径问题（视频）](https://www.youtube.com/watch?v=Aa2sqUhIn-E&index=15&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb)
+- [ ] [6.006 Dijkstra 算法（视频）](https://www.youtube.com/watch?v=NSHizBK9JD8&t=1731s&ab_channel=MITOpenCourseWare)
+- [ ] [6.006 Bellman-Ford 算法（视频）](https://www.youtube.com/watch?v=f9cVS_URPc0&ab_channel=MITOpenCourseWare)
+- [ ] [6.006 加速 Dijkstra 算法（视频）](https://www.youtube.com/watch?v=CHvQ3q_gJ7E&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb&index=18)
+- [ ] [Aduni：图算法 I - 拓扑排序，最小生成树，Prim 算法 - 讲座 6（视频）](https://www.youtube.com/watch?v=i_AQT_XfvD8&index=6&list=PLFDnELG9dpVxQCxuD-9BSy2E7BWY3t5Sm)
+- [ ] [Aduni：图算法 II - DFS，BFS，Kruskal 算法，Union Find 数据结构 - 讲座 7（视频）](https://www.youtube.com/watch?v=ufj5_bppBsA&list=PLFDnELG9dpVxQCxuD-9BSy2E7BWY3t5Sm&index=7)
+- [ ] [Aduni：图算法 III：最短路径 - 讲座 8（视频）](https://www.youtube.com/watch?v=DiedsPsMKXc&list=PLFDnELG9dpVxQCxuD-9BSy2E7BWY3t5Sm&index=8)
+- [ ] [Aduni：图算法 IV：几何算法入门 - 讲座 9（视频）](https://www.youtube.com/watch?v=XIAQRlNkJAw&list=PLFDnELG9dpVxQCxuD-9BSy2E7BWY3t5Sm&index=9)
+- [ ] [CS 61B 2014：加权图（视频）](https://archive.org/details/ucberkeley_webcast_zFbq8vOZ_0k)
+- [ ] [贪婪算法：最小生成树（视频）](https://www.youtube.com/watch?v=tKwnms5iRBU&index=16&list=PLUl4u3cNGP6317WaSNfmCvGym2ucw3oGp)
+- [ ] [强连通分量 Kosaraju 算法图算法（视频）](https://www.youtube.com/watch?v=RpgcYiky7uw)
+- [ ] [[复习] 最短路径算法（播放列表）16 分钟（视频）](https://www.youtube.com/playlist?list=PL9xmBV_5YoZO-Y-H3xIC9DGSfVYJng9Yw)
+- [ ] [[复习] 最小生成树（播放列表）4 分钟（视频）](https://www.youtube.com/playlist?list=PL9xmBV_5YoZObEi3Hf6lmyW-CBfs7nkOV)
 
-- [ ] Stanford 大学关于递归 & 回溯的课程:
-    - [ ] [课程 8 | 抽象编程（视频）](https://www.youtube.com/watch?v=gl3emqCuueQ&list=PLFE6E58F856038C69&index=8)
-    - [ ] [课程 9 | 抽象编程（视频）](https://www.youtube.com/watch?v=uFJhEPrbycQ&list=PLFE6E58F856038C69&index=9)
-    - [ ] [课程 10 | 抽象编程（视频）](https://www.youtube.com/watch?v=NdF1QDTRkck&index=10&list=PLFE6E58F856038C69)
-    - [ ] [课程 11 | 抽象编程（视频）](https://www.youtube.com/watch?v=p-gpaIGRCQI&list=PLFE6E58F856038C69&index=11)
+### Coursera 课程
+
+- [ ] [图的算法（视频）](https://www.coursera.org/learn/algorithms-on-graphs/home/welcome)
+
+### 动手实现
+
+- [ ] DFS 邻接表 (递归)
+- [ ] DFS 邻接表 (栈迭代)
+- [ ] DFS 邻接矩阵 (递归)
+- [ ] DFS 邻接矩阵 (栈迭代)
+- [ ] BFS 邻接表
+- [ ] BFS 邻接矩阵
+- [ ] 单源最短路径问题 (Dijkstra)
+- [ ] 最小生成树
+- 基于 DFS 的算法 (根据上文 Aduni 的视频):
+    - [ ] 检查环 (我们会先检查是否有环存在以便做拓扑排序)
+    - [ ] 拓扑排序
+    - [ ] 计算图中的连通分支
+    - [ ] 列出强连通分量
+    - [ ] 检查双向图
+
+---
+
+## 高级算法
+
+### 递归（Recursion）
+
+递归是函数直接或间接调用自身来分解子问题的技巧，常与分治、回溯结合；理解基线条件与调用栈是正确使用的前提。
+
+#### Stanford 课程
+
+- [ ] [课程 8 | 抽象编程（视频）](https://www.youtube.com/watch?v=gl3emqCuueQ&list=PLFE6E58F856038C69&index=8)
+- [ ] [课程 9 | 抽象编程（视频）](https://www.youtube.com/watch?v=uFJhEPrbycQ&list=PLFE6E58F856038C69&index=9)
+- [ ] [课程 10 | 抽象编程（视频）](https://www.youtube.com/watch?v=NdF1QDTRkck&index=10&list=PLFE6E58F856038C69)
+- [ ] [课程 11 | 抽象编程（视频）](https://www.youtube.com/watch?v=p-gpaIGRCQI&list=PLFE6E58F856038C69&index=11)
+
+#### 何时使用与尾递归
+
 - 什么时候适合使用
 - 尾递归会更好么?
     - [ ] [什么是尾递归以及为什么它如此糟糕?](https://www.quora.com/What-is-tail-recursion-Why-is-it-so-bad)
     - [ ] [尾递归（视频）](https://www.coursera.org/lecture/programming-languages/tail-recursion-YZic1)
+
+#### 通用方法与回溯
+
 - [ ] [解决任何递归问题的 5 个简单步骤（视频）](https://youtu.be/ngCos392W4w)
 
-回溯蓝图: [Java](https://leetcode.com/problems/combination-sum/discuss/16502/A-general-approach-to-backtracking-questions-in-Java-(Subsets-Permutations-Combination-Sum-Palindrome-Partitioning))
-	[Python](https://leetcode.com/problems/combination-sum/discuss/429538/General-Backtracking-questions-solutions-in-Python-for-reference-%3A)
+回溯蓝图: [Java](https://leetcode.com/problems/combination-sum/discuss/16502/A-general-approach-to-backtracking-questions-in-Java-(Subsets-Permutations-Combination-Sum-Palindrome-Partitioning)) · [Python](https://leetcode.com/problems/combination-sum/discuss/429538/General-Backtracking-questions-solutions-in-Python-for-reference-%3A)
 
-## 动态规划（Dynamic Programming）
+### 动态规划（Dynamic Programming）
 
-- 在你的面试中或许没有任何动态规划的问题，
-但能够知道一个题目可以使用动态规划来解决是很重要的。
-- 这一部分会有点困难，每个可以用动态规划解决的问题都必须先定义出递推关系，要推导出来可能会有点棘手。
-- 我建议先阅读和学习足够多的动态规划的例子，以便对解决 DP 问题的一般模式有个扎实的理解。
-- [ ] 视频:
-    - [ ] [Skiena：CSE373 2020 - 讲座 19 - 动态规划简介（视频）](https://www.youtube.com/watch?v=wAA0AMfcJHQ&list=PLOtl7M3yp-DX6ic0HGT0PUX_wiNmkWkXx&index=18)
-    - [ ] [Skiena：CSE373 2020 - 讲座 20 - 编辑距离（视频）](https://www.youtube.com/watch?v=T3A4jlHlhtA&list=PLOtl7M3yp-DX6ic0HGT0PUX_wiNmkWkXx&index=19)
-    - [ ] [Skiena：CSE373 2020 - 讲座 20 - 编辑距离（续）（视频）](https://www.youtube.com/watch?v=iPnPVcZmRbE&list=PLOtl7M3yp-DX6ic0HGT0PUX_wiNmkWkXx&index=20)
-    - [ ] [Skiena：CSE373 2020 - 讲座 21 - 动态规划（视频）](https://www.youtube.com/watch?v=2xPE4Wq8coQ&list=PLOtl7M3yp-DX6ic0HGT0PUX_wiNmkWkXx&index=21)
-    - [ ] [Skiena：CSE373 2020 - 讲座 22 - 动态规划和复习（视频）](https://www.youtube.com/watch?v=Yh3RzqQGsyI&list=PLOtl7M3yp-DX6ic0HGT0PUX_wiNmkWkXx&index=22)
-    - [ ] [Simonson：动态规划 0（从 59:18 开始）（视频）](https://youtu.be/J5aJEcOr6Eo?list=PLFDnELG9dpVxQCxuD-9BSy2E7BWY3t5Sm&t=3558)
-    - [ ] [Simonson：动态规划 I - 第 11 讲（视频）](https://www.youtube.com/watch?v=0EzHjQ_SOeU&index=11&list=PLFDnELG9dpVxQCxuD-9BSy2E7BWY3t5Sm)
-    - [ ] [Simonson：动态规划 II - 第 12 讲（视频）](https://www.youtube.com/watch?v=v1qiRwuJU7g&list=PLFDnELG9dpVxQCxuD-9BSy2E7BWY3t5Sm&index=12)
-    - [ ] 单独的动态规划问题列表（每个都很短）:
-        [动态规划（视频）](https://www.youtube.com/playlist?list=PLrmLmBdmIlpsHaNTPP_jHHDx_os9ItYXr)
-- [ ] 耶鲁课程笔记:
-    - [ ] [动态规划](http://www.cs.yale.edu/homes/aspnes/classes/223/notes.html#dynamicProgramming)
-- [ ] Coursera 课程:
-    - [ ] [RNA 二级结构问题（视频）](https://www.coursera.org/learn/algorithmic-thinking-2/lecture/80RrW/the-rna-secondary-structure-problem)
-    - [ ] [动态规划算法（视频）](https://www.coursera.org/learn/algorithmic-thinking-2/lecture/PSonq/a-dynamic-programming-algorithm)
-    - [ ] [DP 算法描述（视频）](https://www.coursera.org/learn/algorithmic-thinking-2/lecture/oUEK2/illustrating-the-dp-algorithm)
-    - [ ] [DP 算法的运行时间（视频）](https://www.coursera.org/learn/algorithmic-thinking-2/lecture/nfK2r/running-time-of-the-dp-algorithm)
-    - [ ] [DP vs 递归实现（视频）](https://www.coursera.org/learn/algorithmic-thinking-2/lecture/M999a/dp-vs-recursive-implementation)
-    - [ ] [全局成对序列排列（视频）](https://www.coursera.org/learn/algorithmic-thinking-2/lecture/UZ7o6/global-pairwise-sequence-alignment)
-    - [ ] [本地成对序列排列（视频）](https://www.coursera.org/learn/algorithmic-thinking-2/lecture/WnNau/local-pairwise-sequence-alignment)
+在你的面试中或许没有任何动态规划的问题，但能够知道一个题目可以使用动态规划来解决是很重要的。这一部分会有点困难，每个可以用动态规划解决的问题都必须先定义出递推关系，要推导出来可能会有点棘手。我建议先阅读和学习足够多的动态规划的例子，以便对解决 DP 问题的一般模式有个扎实的理解。
 
----
+#### 视频
+
+- [ ] [Skiena：CSE373 2020 - 讲座 19 - 动态规划简介（视频）](https://www.youtube.com/watch?v=wAA0AMfcJHQ&list=PLOtl7M3yp-DX6ic0HGT0PUX_wiNmkWkXx&index=18)
+- [ ] [Skiena：CSE373 2020 - 讲座 20 - 编辑距离（视频）](https://www.youtube.com/watch?v=T3A4jlHlhtA&list=PLOtl7M3yp-DX6ic0HGT0PUX_wiNmkWkXx&index=19)
+- [ ] [Skiena：CSE373 2020 - 讲座 20 - 编辑距离（续）（视频）](https://www.youtube.com/watch?v=iPnPVcZmRbE&list=PLOtl7M3yp-DX6ic0HGT0PUX_wiNmkWkXx&index=20)
+- [ ] [Skiena：CSE373 2020 - 讲座 21 - 动态规划（视频）](https://www.youtube.com/watch?v=2xPE4Wz8coQ&list=PLOtl7M3yp-DX6ic0HGT0PUX_wiNmkWkXx&index=21)
+- [ ] [Skiena：CSE373 2020 - 讲座 22 - 动态规划和复习（视频）](https://www.youtube.com/watch?v=Yh3RzqQGsyI&list=PLOtl7M3yp-DX6ic0HGT0PUX_wiNmkWkXx&index=22)
+- [ ] [Simonson：动态规划 0（从 59:18 开始）（视频）](https://youtu.be/J5aJEcOr6Eo?list=PLFDnELG9dpVxQCxuD-9BSy2E7BWY3t5Sm&t=3558)
+- [ ] [Simonson：动态规划 I - 第 11 讲（视频）](https://www.youtube.com/watch?v=0EzHjQ_SOeU&index=11&list=PLFDnELG9dpVxQCxuD-9BSy2E7BWY3t5Sm)
+- [ ] [Simonson：动态规划 II - 第 12 讲（视频）](https://www.youtube.com/watch?v=v1qiRwuJU7g&list=PLFDnELG9dpVxQCxuD-9BSy2E7BWY3t5Sm&index=12)
+- [ ] 单独的动态规划问题列表（每个都很短）: [动态规划（视频）](https://www.youtube.com/playlist?list=PLrmLmBdmIlpsHaNTPP_jHHDx_os9ItYXr)
+
+#### 耶鲁课程笔记
+
+- [ ] [动态规划](http://www.cs.yale.edu/homes/aspnes/classes/223/notes.html#dynamicProgramming)
+
+#### Coursera 课程
+
+- [ ] [RNA 二级结构问题（视频）](https://www.coursera.org/learn/algorithmic-thinking-2/lecture/80RrW/the-rna-secondary-structure-problem)
+- [ ] [动态规划算法（视频）](https://www.coursera.org/learn/algorithmic-thinking-2/lecture/PSonq/a-dynamic-programming-algorithm)
+- [ ] [DP 算法描述（视频）](https://www.coursera.org/learn/algorithmic-thinking-2/lecture/oUEK2/illustrating-the-dp-algorithm)
+- [ ] [DP 算法的运行时间（视频）](https://www.coursera.org/learn/algorithmic-thinking-2/lecture/nfK2r/running-time-of-the-dp-algorithm)
+- [ ] [DP vs 递归实现（视频）](https://www.coursera.org/learn/algorithmic-thinking-2/lecture/M999a/dp-vs-recursive-implementation)
+- [ ] [全局成对序列排列（视频）](https://www.coursera.org/learn/algorithmic-thinking-2/lecture/UZ7o6/global-pairwise-sequence-alignment)
+- [ ] [本地成对序列排列（视频）](https://www.coursera.org/learn/algorithmic-thinking-2/lecture/WnNau/local-pairwise-sequence-alignment)
