@@ -4,7 +4,7 @@ title: 线性时间构建堆
 
 > 源码: [堆排序 `heapify` 建堆](https://github.com/lllllan02/ciu/tree/master/code/heap-sort)、[大顶堆 `push` 建堆](https://github.com/lllllan02/ciu/tree/master/code/max-heap)
 >
-> 参考: [Hello Algo - 构建堆](https://www.hello-algo.com/chapter_heap/build_heap/)、[大顶堆](/data-structure/max-heap)、[堆排序](/data-structure/heap-sort)、[OI Wiki - 二叉堆](https://oi-wiki.org/ds/binary-heap/)
+> 参考: [Hello Algo - 构建堆](https://www.hello-algo.com/chapter_heap/build_heap/)、[大顶堆](/dsa/max-heap)、[堆排序](/dsa/heap-sort)、[OI Wiki - 二叉堆](https://oi-wiki.org/ds/binary-heap/)
 
 **构建堆（Build Heap）** 指将一组无序元素整理为满足堆序性的完全二叉树。对大顶堆而言，即保证每个节点都不小于其左右孩子，使堆顶为全局最大值。
 
@@ -12,14 +12,14 @@ title: 线性时间构建堆
 
 | 方式 | 思路 | 时间复杂度 | 对应实现 |
 | :--- | :--- | :--- | :--- |
-| **自顶向下** | 逐个插入，每次 `sift_up` | $O(n \log n)$ | [大顶堆](/data-structure/max-heap) 的 `push` |
-| **自底向上（Floyd）** | 从最后一个非叶子节点到根，依次 `sift_down` | $O(n)$ | [堆排序](/data-structure/heap-sort) 的建堆阶段 |
+| **自顶向下** | 逐个插入，每次 `sift_up` | $O(n \log n)$ | [大顶堆](/dsa/max-heap) 的 `push` |
+| **自底向上（Floyd）** | 从最后一个非叶子节点到根，依次 `sift_down` | $O(n)$ | [堆排序](/dsa/heap-sort) 的建堆阶段 |
 
 直觉上「对每个节点都下滤一次」像是 $O(n \log n)$，但 Floyd 自底向上建堆的总量级是 **线性** 的——关键在于 **越靠近叶子，节点越少、可下沉层数也越少**。
 
 ## 前提：数组表示与下标关系
 
-与 [大顶堆](/data-structure/max-heap) 相同，完全二叉树用一维数组表示，根下标为 0：
+与 [大顶堆](/dsa/max-heap) 相同，完全二叉树用一维数组表示，根下标为 0：
 
 | 关系 | 公式 |
 | :--- | :--- |
@@ -42,7 +42,7 @@ for (int i = 0; i < n; i++) {
 
 单次 `push` 至多调整 $O(\log n)$ 层，共 $n$ 次，故总时间 **$O(n \log n)$**。
 
-这种方式适合 **流式插入**（元素逐个到来、堆在增长），也是 [大顶堆](/data-structure/max-heap) 的日常用法。
+这种方式适合 **流式插入**（元素逐个到来、堆在增长），也是 [大顶堆](/dsa/max-heap) 的日常用法。
 
 ## 方法二：自底向上 Floyd 建堆（$O(n)$）
 
@@ -61,7 +61,7 @@ for (int i = end; i >= 0; i--) {
 }
 ```
 
-`heapify` 与 [大顶堆](/data-structure/max-heap) 中的 `sift_down` 逻辑一致：若当前节点小于左右孩子中的较大者，则交换并继续下沉，直到满足堆序性或成为叶子。
+`heapify` 与 [大顶堆](/dsa/max-heap) 中的 `sift_down` 逻辑一致：若当前节点小于左右孩子中的较大者，则交换并继续下沉，直到满足堆序性或成为叶子。
 
 ```c
 static void heapify(int *arr, int start, int end) {
@@ -77,7 +77,7 @@ static void heapify(int *arr, int start, int end) {
 }
 ```
 
-[堆排序](/data-structure/heap-sort) 先以此法建大顶堆，再反复交换堆顶与末尾并缩小堆范围，完成原地排序。
+[堆排序](/dsa/heap-sort) 先以此法建大顶堆，再反复交换堆顶与末尾并缩小堆范围，完成原地排序。
 
 ## 为何 Floyd 建堆是 $O(n)$
 
@@ -108,12 +108,12 @@ $$
 
 ## 与堆排序的关系
 
-[堆排序](/data-structure/heap-sort) 的第一阶段就是 Floyd 建堆；第二阶段才是 $O(n \log n)$ 的「反复取堆顶」。因此：
+[堆排序](/dsa/heap-sort) 的第一阶段就是 Floyd 建堆；第二阶段才是 $O(n \log n)$ 的「反复取堆顶」。因此：
 
 - **仅建堆**：$O(n)$
 - **建堆 + 排序**：$O(n \log n)$
 
-若只需维护一个优先级队列并支持动态插入，用 [大顶堆](/data-structure/max-heap) 的 `push` 更合适；若要对 **已有数组** 一次性建堆或原地排序，Floyd 自底向上更高效。
+若只需维护一个优先级队列并支持动态插入，用 [大顶堆](/dsa/max-heap) 的 `push` 更合适；若要对 **已有数组** 一次性建堆或原地排序，Floyd 自底向上更高效。
 
 ## 测试
 

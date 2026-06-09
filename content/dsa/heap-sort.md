@@ -4,11 +4,11 @@ title: 堆排序
 
 > 源码: https://github.com/lllllan02/ciu/tree/master/code/heap-sort
 >
-> 参考: [菜鸟教程 - 堆排序](https://www.runoob.com/w3cnote/heap-sort.html)、[大顶堆](/data-structure/max-heap)、[OI Wiki - 二叉堆](https://oi-wiki.org/ds/binary-heap/)
+> 参考: [菜鸟教程 - 堆排序](https://www.runoob.com/w3cnote/heap-sort.html)、[大顶堆](/dsa/max-heap)、[OI Wiki - 二叉堆](https://oi-wiki.org/ds/binary-heap/)
 
 堆排序（Heap Sort）是一种 **原地** 比较排序算法，利用 **大顶堆** 的堆顶始终是最大值这一性质：反复取出堆顶放到数组末尾，再对剩余部分重新调整为大顶堆，最终得到升序数组。
 
-本实现直接在待排序数组上建堆与下滤，无需额外堆结构；`heapify` 与 [大顶堆](/data-structure/max-heap) 中的 `sift_down` 逻辑一致。
+本实现直接在待排序数组上建堆与下滤，无需额外堆结构；`heapify` 与 [大顶堆](/dsa/max-heap) 中的 `sift_down` 逻辑一致。
 
 ## 核心思路
 
@@ -21,7 +21,7 @@ title: 堆排序
 
 ## 数组下标关系
 
-与 [大顶堆](/data-structure/max-heap) 相同，完全二叉树用一维数组表示，根下标为 0：
+与 [大顶堆](/dsa/max-heap) 相同，完全二叉树用一维数组表示，根下标为 0：
 
 | 关系 | 公式 |
 | :--- | :--- |
