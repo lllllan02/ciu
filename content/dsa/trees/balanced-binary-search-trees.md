@@ -6,7 +6,7 @@ title: 平衡二叉搜索树
 >
 > 参考: [OI Wiki - 二叉搜索树 & 平衡树](https://oi-wiki.org/ds/bst/)
 
-平衡二叉搜索树（Balanced Binary Search Tree）在 [二叉搜索树](/dsa/binary-search-trees) 的 BST 性质之上，通过旋转操作约束树高，使查找、插入、删除的最坏时间复杂度稳定在 $O(\log n)$。
+平衡二叉搜索树（Balanced Binary Search Tree）在 [二叉搜索树](/dsa/trees/binary-search-trees) 的 BST 性质之上，通过旋转操作约束树高，使查找、插入、删除的最坏时间复杂度稳定在 $O(\log n)$。
 
 本实现采用 **AVL 树** 策略：每个节点维护 `height`，当左右子树高度差超过 1 时触发旋转修复。
 
@@ -149,7 +149,7 @@ typedef struct TreeNode {
 
 ### 删除
 
-删除逻辑与普通 BST 相同（叶子 / 单子 / 双子三种情况，双子节点用左子树最大值替换），区别在于每次递归返回后调用 `rebalance` 恢复平衡。详见 [二叉搜索树 - 删除的三种情况](/dsa/binary-search-trees#删除的三种情况)。
+删除逻辑与普通 BST 相同（叶子 / 单子 / 双子三种情况，双子节点用左子树最大值替换），区别在于每次递归返回后调用 `rebalance` 恢复平衡。详见 [二叉搜索树 - 删除的三种情况](/dsa/trees/binary-search-trees#删除的三种情况)。
 
 ## 复杂度分析
 
