@@ -206,6 +206,7 @@ title: Coding Interview University 的学习记录
 - [x] [OI Wiki - 堆简介](https://oi-wiki.org/ds/heap/) (2026-06-08)
 - [x] [OI Wiki - 二叉堆](https://oi-wiki.org/ds/binary-heap/) (2026-06-08)
 - [x] [Hello Algo - 堆](https://www.hello-algo.com/chapter_heap/heap/) (2026-06-08)
+- [x] [菜鸟教程 - 堆排序](https://www.runoob.com/w3cnote/heap-sort.html) (2026-06-09)
 - [ ] [堆（Heap）](https://en.wikipedia.org/wiki/Heap_(data_structure))
 - [ ] [堆简介（视频）](https://www.coursera.org/lecture/data-structures/introduction-2OpTs)
 - [ ] [二叉树（视频）](https://www.coursera.org/learn/data-structures/lecture/GRV2q/binary-trees)
@@ -222,6 +223,7 @@ title: Coding Interview University 的学习记录
 - [ ] [[复习] 13 分钟了解堆（视频）](https://www.youtube.com/playlist?list=PL9xmBV_5YoZNsyqgPW-DNwUeT8F8uhWc6)
 
 > - [x] [实现大顶堆](/data-structure/max-heap) (2026-06-08)
+> - [x] [实现堆排序](/data-structure/heap-sort) (2026-06-09)
 
 ## 排序（Sorting）
 
