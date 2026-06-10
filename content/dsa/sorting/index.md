@@ -36,9 +36,12 @@ order: 4
 
 相邻元素两两比较并交换，较大元素逐步「冒泡」到末尾。平均与最坏 $O(n^2)$，最好（已有序）$O(n)$；原地、**稳定**。教学常用，实际工程较少采用。
 
+- [x] [菜鸟教程 - 冒泡排序](https://www.runoob.com/w3cnote/bubble-sort.html) (2026-06-10)
 - [ ] [冒泡排序（视频）](https://www.youtube.com/watch?v=P00xJgWzz2c&index=1&list=PL89B61F78B552C1AB)
 - [ ] [冒泡排序分析（视频）](https://www.youtube.com/watch?v=ni_zk257Nqo&index=7&list=PL89B61F78B552C1AB)
 - [ ] [Bubble sort in 2 minutes (video)](https://youtu.be/xli_FI7CuzA)
+
+> - [x] [实现冒泡排序](/dsa/sorting/bubble-sort) (2026-06-10)
 
 ### 选择排序
 
