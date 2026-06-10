@@ -19,34 +19,24 @@ order: 4
 
 | 排序算法 | 平均时间复杂度 | 最好情况 | 最坏情况 | 空间复杂度 | 排序方式 | 稳定性 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| 冒泡排序 | $O(n^2)$ | $O(n)$ | $O(n^2)$ | $O(1)$ | 原地 | 稳定 |
+| [冒泡排序](/dsa/sorting/bubble-sort) | $O(n^2)$ | $O(n)$ | $O(n^2)$ | $O(1)$ | 原地 | **稳定** |
 | 选择排序 | $O(n^2)$ | $O(n^2)$ | $O(n^2)$ | $O(1)$ | 原地 | 不稳定 |
-| 插入排序 | $O(n^2)$ | $O(n)$ | $O(n^2)$ | $O(1)$ | 原地 | 稳定 |
+| 插入排序 | $O(n^2)$ | $O(n)$ | $O(n^2)$ | $O(1)$ | 原地 | **稳定** |
 | 希尔排序 | $O(n \log n)$ | $O(n \log^2 n)$ | $O(n \log^2 n)$ | $O(1)$ | 原地 | 不稳定 |
-| 归并排序 | $O(n \log n)$ | $O(n \log n)$ | $O(n \log n)$ | $O(n)$ | 非原地 | 稳定 |
+| 归并排序 | $O(n \log n)$ | $O(n \log n)$ | $O(n \log n)$ | $O(n)$ | 非原地 | **稳定** |
 | 快速排序 | $O(n \log n)$ | $O(n \log n)$ | $O(n^2)$ | $O(\log n)$ | 原地 | 不稳定 |
 | 堆排序 | $O(n \log n)$ | $O(n \log n)$ | $O(n \log n)$ | $O(1)$ | 原地 | 不稳定 |
-| 计数排序 | $O(n + k)$ | $O(n + k)$ | $O(n + k)$ | $O(k)$ | 非原地 | 稳定 |
-| 桶排序 | $O(n + k)$ | $O(n + k)$ | $O(n^2)$ | $O(n + k)$ | 非原地 | 稳定 |
-| 基数排序 | $O(n \times k)$ | $O(n \times k)$ | $O(n \times k)$ | $O(n + k)$ | 非原地 | 稳定 |
+| 计数排序 | $O(n + k)$ | $O(n + k)$ | $O(n + k)$ | $O(k)$ | 非原地 | **稳定** |
+| 桶排序 | $O(n + k)$ | $O(n + k)$ | $O(n^2)$ | $O(n + k)$ | 非原地 | **稳定** |
+| 基数排序 | $O(n \times k)$ | $O(n \times k)$ | $O(n \times k)$ | $O(n + k)$ | 非原地 | **稳定** |
 
 > 表中 $k$ 表示键值范围或位数等辅助参数；「原地」指额外空间为常数级（不含输入本身），「非原地」通常需要与 $n$ 或 $k$ 相关的辅助空间。
-
-### 冒泡排序
-
-相邻元素两两比较并交换，较大元素逐步「冒泡」到末尾。平均与最坏 $O(n^2)$，最好（已有序）$O(n)$；原地、**稳定**。教学常用，实际工程较少采用。
-
-- [x] [菜鸟教程 - 冒泡排序](https://www.runoob.com/w3cnote/bubble-sort.html) (2026-06-10)
-- [ ] [冒泡排序（视频）](https://www.youtube.com/watch?v=P00xJgWzz2c&index=1&list=PL89B61F78B552C1AB)
-- [ ] [冒泡排序分析（视频）](https://www.youtube.com/watch?v=ni_zk257Nqo&index=7&list=PL89B61F78B552C1AB)
-- [ ] [Bubble sort in 2 minutes (video)](https://youtu.be/xli_FI7CuzA)
-
-> - [x] [实现冒泡排序](/dsa/sorting/bubble-sort) (2026-06-10)
 
 ### 选择排序
 
 每轮从未排序部分选出最小（或最大）元素放到正确位置。平均、最好与最坏均为 $O(n^2)$；原地、**不稳定**。
 
+- [x] [菜鸟教程 - 选择排序](https://www.runoob.com/w3cnote/selection-sort.html) (2026-06-10)
 - [ ] [选择排序（视频）](https://www.youtube.com/watch?v=6nDMgr0-Yyo&index=8&list=PL89B61F78B552C1AB)
 - [ ] [Selection sort in 3 minutes (video)](https://youtu.be/g-PGLbMth_g)
 
@@ -56,12 +46,16 @@ order: 4
 
 逐个将元素插入已排序部分的正确位置。平均与最坏 $O(n^2)$，最好（近乎有序）$O(n)$；原地、**稳定**；数据近乎有序时表现很好。
 
+- [x] [菜鸟教程 - 插入排序](https://www.runoob.com/w3cnote/insertion-sort.html) (2026-06-10)
 - [ ] [插入排序（视频）](https://www.youtube.com/watch?v=c4BRHC7kTaQ&index=2&list=PL89B61F78B552C1AB)
 - [ ] [Insertion sort in 2 minutes (video)](https://youtu.be/JU767SDMDvA)
 
 > - [x] [实现插入排序](/dsa/sorting/insertion-sort) (2026-06-10)
 
 ### 希尔排序
+
+- [x] [菜鸟教程 - 希尔排序](https://www.runoob.com/w3cnote/shell-sort.html) (2026-06-10)
+- [x] [OI Wiki - 希尔排序](https://oi-wiki.org/basic/shell-sort/) (2026-06-10)
 
 插入排序的改进：按递减间隔分组做插入排序，逐步缩小间隔至 1。平均约 $O(n \log n)$，最好与最坏约 $O(n \log^2 n)$（与增量序列有关）；原地、**不稳定**。
 
