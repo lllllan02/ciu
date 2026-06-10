@@ -20,7 +20,7 @@ order: 4
 | 排序算法 | 平均时间复杂度 | 最好情况 | 最坏情况 | 空间复杂度 | 排序方式 | 稳定性 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | [冒泡排序](/dsa/sorting/bubble-sort) | $O(n^2)$ | $O(n)$ | $O(n^2)$ | $O(1)$ | 原地 | **稳定** |
-| 选择排序 | $O(n^2)$ | $O(n^2)$ | $O(n^2)$ | $O(1)$ | 原地 | 不稳定 |
+| [选择排序](/dsa/sorting/selection-sort) | $O(n^2)$ | $O(n^2)$ | $O(n^2)$ | $O(1)$ | 原地 | 不稳定 |
 | 插入排序 | $O(n^2)$ | $O(n)$ | $O(n^2)$ | $O(1)$ | 原地 | **稳定** |
 | 希尔排序 | $O(n \log n)$ | $O(n \log^2 n)$ | $O(n \log^2 n)$ | $O(1)$ | 原地 | 不稳定 |
 | 归并排序 | $O(n \log n)$ | $O(n \log n)$ | $O(n \log n)$ | $O(n)$ | 非原地 | **稳定** |
@@ -31,16 +31,6 @@ order: 4
 | 基数排序 | $O(n \times k)$ | $O(n \times k)$ | $O(n \times k)$ | $O(n + k)$ | 非原地 | **稳定** |
 
 > 表中 $k$ 表示键值范围或位数等辅助参数；「原地」指额外空间为常数级（不含输入本身），「非原地」通常需要与 $n$ 或 $k$ 相关的辅助空间。
-
-### 选择排序
-
-每轮从未排序部分选出最小（或最大）元素放到正确位置。平均、最好与最坏均为 $O(n^2)$；原地、**不稳定**。
-
-- [x] [菜鸟教程 - 选择排序](https://www.runoob.com/w3cnote/selection-sort.html) (2026-06-10)
-- [ ] [选择排序（视频）](https://www.youtube.com/watch?v=6nDMgr0-Yyo&index=8&list=PL89B61F78B552C1AB)
-- [ ] [Selection sort in 3 minutes (video)](https://youtu.be/g-PGLbMth_g)
-
-> - [x] [实现选择排序](/dsa/sorting/selection-sort) (2026-06-10)
 
 ### 插入排序
 
