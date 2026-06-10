@@ -59,7 +59,7 @@ order: 4
 - [ ] [插入排序（视频）](https://www.youtube.com/watch?v=c4BRHC7kTaQ&index=2&list=PL89B61F78B552C1AB)
 - [ ] [Insertion sort in 2 minutes (video)](https://youtu.be/JU767SDMDvA)
 
-> - [ ] 动手实现：最坏、平均时间复杂度均为 O(n^2)。
+> - [x] [实现插入排序](/dsa/sorting/insertion-sort) (2026-06-10)
 
 ### 希尔排序
 
