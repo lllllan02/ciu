@@ -22,7 +22,7 @@ order: 4
 | [冒泡排序](/dsa/sorting/bubble-sort) | $O(n^2)$ | $O(n)$ | $O(n^2)$ | $O(1)$ | 原地 | **稳定** |
 | [选择排序](/dsa/sorting/selection-sort) | $O(n^2)$ | $O(n^2)$ | $O(n^2)$ | $O(1)$ | 原地 | 不稳定 |
 | [插入排序](/dsa/sorting/insertion-sort) | $O(n^2)$ | $O(n)$ | $O(n^2)$ | $O(1)$ | 原地 | **稳定** |
-| 希尔排序 | $O(n \log n)$ | $O(n \log^2 n)$ | $O(n \log^2 n)$ | $O(1)$ | 原地 | 不稳定 |
+| [希尔排序](/dsa/sorting/shell-sort) | $O(n \log n)$ | $O(n \log^2 n)$ | $O(n \log^2 n)$ | $O(1)$ | 原地 | 不稳定 |
 | 归并排序 | $O(n \log n)$ | $O(n \log n)$ | $O(n \log n)$ | $O(n)$ | 非原地 | **稳定** |
 | 快速排序 | $O(n \log n)$ | $O(n \log n)$ | $O(n^2)$ | $O(\log n)$ | 原地 | 不稳定 |
 | 堆排序 | $O(n \log n)$ | $O(n \log n)$ | $O(n \log n)$ | $O(1)$ | 原地 | 不稳定 |
@@ -31,13 +31,6 @@ order: 4
 | 基数排序 | $O(n \times k)$ | $O(n \times k)$ | $O(n \times k)$ | $O(n + k)$ | 非原地 | **稳定** |
 
 > 表中 $k$ 表示键值范围或位数等辅助参数；「原地」指额外空间为常数级（不含输入本身），「非原地」通常需要与 $n$ 或 $k$ 相关的辅助空间。
-
-### 希尔排序
-
-- [x] [菜鸟教程 - 希尔排序](https://www.runoob.com/w3cnote/shell-sort.html) (2026-06-10)
-- [x] [OI Wiki - 希尔排序](https://oi-wiki.org/basic/shell-sort/) (2026-06-10)
-
-插入排序的改进：按递减间隔分组做插入排序，逐步缩小间隔至 1。平均约 $O(n \log n)$，最好与最坏约 $O(n \log^2 n)$（与增量序列有关）；原地、**不稳定**。
 
 ### 归并排序
 
