@@ -14,18 +14,12 @@ order: 4
 - [x] [排序算法的稳定性](http://www.geeksforgeeks.org/stability-in-sorting-algorithms/) (2026-06-09)
 - [ ] [排序算法的稳定性](http://stackoverflow.com/questions/1517793/stability-in-sorting-algorithms)
 - [ ] [排序算法 - 稳定性](http://homepages.math.uic.edu/~leon/cs-mcs401-s08/handouts/stability.pdf)
-- [ ] [排序复杂性（Sorting Complexity）](https://www.coursera.org/lecture/algorithms-part1/sorting-complexity-xAltF)
-- [ ] [比较器（Comparators）](https://www.coursera.org/lecture/algorithms-part1/comparators-9FYhS)
-- [ ] [稳定性（Stability）](https://www.coursera.org/learn/algorithms-part1/lecture/pvvLZ/stability)
-- [ ] [系统排序（System Sorts）](https://www.coursera.org/lecture/algorithms-part1/system-sorts-QBNZ7)
 
 ### 归并排序
 
 分治：将数组分成两半分别排序后合并。时间复杂度稳定为 $O(n \log n)$，额外空间通常为 $O(n)$，是**稳定**排序。在链表上同样高效，是对链表做通用排序的推荐方式。
 
 - [x] [菜鸟教程 - 归并排序](https://www.runoob.com/w3cnote/merge-sort.html) (2026-06-09)
-- [ ] [归并排序（Mergesort）](https://www.coursera.org/lecture/algorithms-part1/mergesort-ARWDq)
-- [ ] [自底向上的归并排序（Bottom up Mergesort）](https://www.coursera.org/learn/algorithms-part1/lecture/PWNEl/bottom-up-mergesort)
 - [ ] [链表的归并排序](http://www.geeksforgeeks.org/merge-sort-for-linked-list/)
 - [ ] [插入排序 & 归并排序（视频）](https://www.youtube.com/watch?v=Kg4bqzAqRBM&index=3&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb)
 - [ ] [归并排序（视频）](https://www.youtube.com/watch?v=GCae1WNvnZM&index=3&list=PL89B61F78B552C1AB)
@@ -40,8 +34,7 @@ order: 4
 
 选基准分区后递归排序。平均 $O(n \log n)$，最坏 $O(n^2)$；标准实现**不稳定**，更适合随机访问的数组。
 
-- [ ] [快速排序（Quicksort）](https://www.coursera.org/lecture/algorithms-part1/quicksort-vjvnC)
-- [ ] [重复键（Duplicate Keys）](https://www.coursera.org/lecture/algorithms-part1/duplicate-keys-XvjPd)
+- [x] [菜鸟教程 - 快速排序](https://www.runoob.com/w3cnote/quick-sort-2.html) (2026-06-10)
 - [ ] [快排（视频）](https://www.youtube.com/watch?v=y_G9BkAm6B8&index=4&list=PL89B61F78B552C1AB)
 - [ ] [Quick sort in 4 minutes (video)](https://youtu.be/Hoixgm4-P4M)
 - [ ] [随机算法: 矩阵相乘, 快排, Freivalds' 算法（视频）](https://www.youtube.com/watch?v=cNB2lADK3_s&index=8&list=PLUl4u3cNGP6317WaSNfmCvGym2ucw3oGp)
@@ -49,7 +42,7 @@ order: 4
 - [ ] [实现（C 语言）](https://github.com/jwasham/practice-c/blob/master/quick_sort/quick_sort.c)
 - [ ] [实现（Python 语言）](https://github.com/jwasham/practice-python/blob/master/quick_sort/quick_sort.py)
 
-> - [ ] 动手实现：平均时间复杂度为 O(n log n)。
+> - [x] [实现快速排序](/dsa/sorting/quick-sort) (2026-06-10)
 
 ### 堆排序
 
@@ -72,7 +65,6 @@ order: 4
 
 每轮从未排序部分选出最小（或最大）元素放到正确位置。最坏与平均均为 $O(n^2)$，**不稳定**。
 
-- [ ] [选择排序（Selection）](https://www.coursera.org/lecture/algorithms-part1/selection-UQxFT)
 - [ ] [选择排序（视频）](https://www.youtube.com/watch?v=6nDMgr0-Yyo&index=8&list=PL89B61F78B552C1AB)
 - [ ] [Selection sort in 3 minutes (video)](https://youtu.be/g-PGLbMth_g)
 
@@ -90,13 +82,6 @@ order: 4
 
 不基于元素间比较，在键值范围有限时可达到 $O(n)$ 量级；包括计数排序、基数排序等。
 
-- [Sedgewick──基数排序 (6 个视频)](https://www.coursera.org/learn/algorithms-part2/home/week/3)
-    - [ ] [1. Java 中的字符串](https://www.coursera.org/learn/algorithms-part2/lecture/vGHvb/strings-in-java)
-    - [ ] [2. 键值索引计数（Key Indexed Counting）](https://www.coursera.org/learn/algorithms-part2/lecture/2pi1Z/key-indexed-counting)
-    - [ ] [3. Least Significant Digit First String Radix Sort](https://www.coursera.org/learn/algorithms-part2/lecture/c1U7L/lsd-radix-sort)
-    - [ ] [4. Most Significant Digit First String Radix Sort](https://www.coursera.org/learn/algorithms-part2/lecture/gFxwG/msd-radix-sort)
-    - [ ] [5. 3 中基数快速排序](https://www.coursera.org/learn/algorithms-part2/lecture/crkd5/3-way-radix-quicksort)
-    - [ ] [6. 后继数组（Suffix Arrays）](https://www.coursera.org/learn/algorithms-part2/lecture/TH18W/suffix-arrays)
 - [ ] [基数排序](http://www.cs.yale.edu/homes/aspnes/classes/223/notes.html#radixSort)
 - [ ] [基数排序（视频）](https://www.youtube.com/watch?v=xhr26ia4k38)
 - [ ] [基数排序, 计数排序 (线性时间内)（视频）](https://www.youtube.com/watch?v=Nz1KZXbghj8&index=7&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb)
