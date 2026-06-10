@@ -21,7 +21,7 @@ order: 4
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | [冒泡排序](/dsa/sorting/bubble-sort) | $O(n^2)$ | $O(n)$ | $O(n^2)$ | $O(1)$ | 原地 | **稳定** |
 | [选择排序](/dsa/sorting/selection-sort) | $O(n^2)$ | $O(n^2)$ | $O(n^2)$ | $O(1)$ | 原地 | 不稳定 |
-| 插入排序 | $O(n^2)$ | $O(n)$ | $O(n^2)$ | $O(1)$ | 原地 | **稳定** |
+| [插入排序](/dsa/sorting/insertion-sort) | $O(n^2)$ | $O(n)$ | $O(n^2)$ | $O(1)$ | 原地 | **稳定** |
 | 希尔排序 | $O(n \log n)$ | $O(n \log^2 n)$ | $O(n \log^2 n)$ | $O(1)$ | 原地 | 不稳定 |
 | 归并排序 | $O(n \log n)$ | $O(n \log n)$ | $O(n \log n)$ | $O(n)$ | 非原地 | **稳定** |
 | 快速排序 | $O(n \log n)$ | $O(n \log n)$ | $O(n^2)$ | $O(\log n)$ | 原地 | 不稳定 |
@@ -31,16 +31,6 @@ order: 4
 | 基数排序 | $O(n \times k)$ | $O(n \times k)$ | $O(n \times k)$ | $O(n + k)$ | 非原地 | **稳定** |
 
 > 表中 $k$ 表示键值范围或位数等辅助参数；「原地」指额外空间为常数级（不含输入本身），「非原地」通常需要与 $n$ 或 $k$ 相关的辅助空间。
-
-### 插入排序
-
-逐个将元素插入已排序部分的正确位置。平均与最坏 $O(n^2)$，最好（近乎有序）$O(n)$；原地、**稳定**；数据近乎有序时表现很好。
-
-- [x] [菜鸟教程 - 插入排序](https://www.runoob.com/w3cnote/insertion-sort.html) (2026-06-10)
-- [ ] [插入排序（视频）](https://www.youtube.com/watch?v=c4BRHC7kTaQ&index=2&list=PL89B61F78B552C1AB)
-- [ ] [Insertion sort in 2 minutes (video)](https://youtu.be/JU767SDMDvA)
-
-> - [x] [实现插入排序](/dsa/sorting/insertion-sort) (2026-06-10)
 
 ### 希尔排序
 
