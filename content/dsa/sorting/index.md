@@ -50,7 +50,7 @@ order: 4
 - [ ] [选择排序（视频）](https://www.youtube.com/watch?v=6nDMgr0-Yyo&index=8&list=PL89B61F78B552C1AB)
 - [ ] [Selection sort in 3 minutes (video)](https://youtu.be/g-PGLbMth_g)
 
-> - [ ] 动手实现：最坏、平均时间复杂度均为 O(n^2)。
+> - [x] [实现选择排序](/dsa/sorting/selection-sort) (2026-06-10)
 
 ### 插入排序
 
