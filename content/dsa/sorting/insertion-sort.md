@@ -13,7 +13,7 @@ order: 3
 
 工作原理：外层 `i` 从 `1` 起扩展已排序前缀；每次取出 `arr[i]` 作为 `key`，在已排序段 `[0..i-1]` 中从右向左找插入位置，较大元素右移一格，最后放入 `key`。
 
-![插入排序动画](https://oi-wiki.org/basic/images/insertion-sort-animate.svg)
+![插入排序动画](/images/insertion-sort-animate.svg)
 
 下方动图以抓扑克牌为类比：初始手牌为 `[8, 2, 6, 3, 10, 9, 4, A, 7, 5]`，`A` 视作 `1`（Ace）。每轮从右侧取一张牌，插入左侧已排好序的部分：
 
