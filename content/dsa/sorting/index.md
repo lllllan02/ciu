@@ -31,14 +31,3 @@ order: 4
 | [基数排序](/dsa/sorting/radix-sort) | $O(n \times k)$ | $O(n \times k)$ | $O(n \times k)$ | $O(n + k)$ | 非原地 | **稳定** |
 
 > 表中 $k$ 表示键值范围或位数等辅助参数；「原地」指额外空间为常数级（不含输入本身），「非原地」通常需要与 $n$ 或 $k$ 相关的辅助空间。
-
-## 综合资源
-
-- [ ] [CS 61B Lecture 29：排序 I（视频）](https://archive.org/details/ucberkeley_webcast_EiUvYS2DT6I)
-- [ ] [CS 61B Lecture 30：排序 II（视频）](https://archive.org/details/ucberkeley_webcast_2hTY3t80Qsk)
-- [ ] [CS 61B Lecture 32：排序 III（视频）](https://archive.org/details/ucberkeley_webcast_Y6LOLpxg6Dc)
-- [ ] [CS 61B Lecture 33：排序 V（视频）](https://archive.org/details/ucberkeley_webcast_qNMQ4ly43p4)
-- [ ] [[Review] Sorting (playlist) in 18 minutes](https://www.youtube.com/playlist?list=PL9xmBV_5YoZOZSbGAXAPIq1BeUf4j20pl)
-- [ ] [15 种排序算法可视化（视频）](https://www.youtube.com/watch?v=kPRA0W1kECg)
-
-如果你需要有关此主题的更多详细信息，请参阅「[一些主题的额外内容](/optional#一些主题的额外内容)」中的「排序」部分。
