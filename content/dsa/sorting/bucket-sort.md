@@ -141,6 +141,6 @@ static int float_bucket_index(float value, float min_val, float max_val, int buc
 
 ## 参考阅读
 
-- [x] [OI Wiki - 桶排序](https://oi-wiki.org/basic/bucket-sort/) (2026-06-10)
-- [x] [菜鸟教程 - 桶排序](https://www.runoob.com/w3cnote/bucket-sort.html) (2026-06-10)
+- [x] [OI Wiki - 桶排序](https://oi-wiki.org/basic/bucket-sort/) (2026-06-11)
+- [x] [菜鸟教程 - 桶排序](https://www.runoob.com/w3cnote/bucket-sort.html) (2026-06-11)
 - [ ] [Bucket sort in 4 minutes (video)](https://youtu.be/NAzOkAD0z3Q)

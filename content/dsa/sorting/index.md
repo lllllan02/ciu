@@ -28,19 +28,9 @@ order: 4
 | [堆排序](/dsa/sorting/heap-sort) | $O(n \log n)$ | $O(n \log n)$ | $O(n \log n)$ | $O(1)$ | 原地 | 不稳定 |
 | [计数排序](/dsa/sorting/counting-sort) | $O(n + k)$ | $O(n + k)$ | $O(n + k)$ | $O(k)$ | 非原地 | **稳定** |
 | [桶排序](/dsa/sorting/bucket-sort) | $O(n + k)$ | $O(n + k)$ | $O(n^2)$ | $O(n + k)$ | 非原地 | **稳定** |
-| 基数排序 | $O(n \times k)$ | $O(n \times k)$ | $O(n \times k)$ | $O(n + k)$ | 非原地 | **稳定** |
+| [基数排序](/dsa/sorting/radix-sort) | $O(n \times k)$ | $O(n \times k)$ | $O(n \times k)$ | $O(n + k)$ | 非原地 | **稳定** |
 
 > 表中 $k$ 表示键值范围或位数等辅助参数；「原地」指额外空间为常数级（不含输入本身），「非原地」通常需要与 $n$ 或 $k$ 相关的辅助空间。
-
-### 基数排序
-
-按位（或按 digit）从低位到高位依次做稳定排序（常用计数排序作子过程）。平均、最好与最坏均为 $O(n \times k)$（$k$ 为位数或基数相关参数），额外空间 $O(n + k)$，非原地、**稳定**。
-
-- [ ] [基数排序](http://www.cs.yale.edu/homes/aspnes/classes/223/notes.html#radixSort)
-- [ ] [基数排序（视频）](https://www.youtube.com/watch?v=xhr26ia4k38)
-- [ ] [基数排序, 计数排序 (线性时间内)（视频）](https://www.youtube.com/watch?v=Nz1KZXbghj8&index=7&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb)
-- [ ] [CS 61B 2014-04-21：基数排序（视频）](https://archive.org/details/ucberkeley_webcast_pvbBMd-3NoI)
-- [ ] [线性时间内的排序（视频）](https://www.youtube.com/watch?v=pOKy3RZbSws&list=PLUl4u3cNGP61hsJNdULdudlRL493b-XZf&index=14)
 
 ## 综合资源
 
