@@ -15,12 +15,16 @@ order: 7
 
 工作原理：先在原数组上建 **大顶堆**，再反复「交换堆顶到末尾 + 下滤」。
 
-1. **建堆**：从最后一个非叶子节点到根，依次对每个下标 **下滤（heapify）**，将数组调整为大顶堆。
-2. **取堆顶**：交换 `arr[0]` 与当前堆的最后一个元素，最大值就位。
-3. **缩小堆**：堆范围减 1，对新的堆顶 `arr[0]` 下滤。
-4. **结束**：重复步骤 2–3 直至堆只剩一个元素。
+1. **建堆**：自底向上，从最后一个有孩子的节点到根，依次 **下滤**，使每个父节点都不小于其孩子。
+2. **取堆顶**：堆顶（当前最大值）与堆的最后一个元素交换，最大值移到末尾就位。
+3. **缩小堆**：堆的有效范围减 1，对新堆顶下滤，恢复大顶堆。
+4. **结束**：重复 2–3 直至全部有序。
 
-完全二叉树用一维数组表示（根下标为 0）：
+![堆排序动画](/images/heap-sort.gif)
+
+动图对 `[91, 60, 96, 13, 35, 65, 46, 65, 10, 30, 20, 31, 77, 81, 22]` 执行完整流程：上方以完全二叉树展示堆结构，下方为数组；绿色为堆内元素，变红表示已就位。
+
+完全二叉树可压平为一维数组存储（根在首位）：
 
 | 关系 | 公式 |
 | :--- | :--- |
@@ -28,13 +32,13 @@ order: 7
 | 右孩子 | $2i + 2$ |
 | 父节点 | $\lfloor (i - 1) / 2 \rfloor$ |
 
-以 `[5, 3, 8, 4, 2]` 为例，建堆后大顶堆为 `[8, 4, 5, 2, 3]`（数组表示），排序阶段：
+建堆完成后，最大值 `96` 位于堆顶。排序阶段每轮将堆顶换至末尾并就位，再对剩余部分下滤：
 
-| 轮次 | 交换 | 堆（未就位部分） |
+| 轮次 | 操作 | 说明 |
 | :--- | :--- | :--- |
-| 1 | `8` ↔ `3` | `[5, 4, 3, 2 \| 8]` |
-| 2 | `5` ↔ `2` | `[4, 2, 3 \| 5, 8]` |
-| … | … | 继续直至有序 |
+| 1 | 堆顶 `96` ↔ 末尾 `22` | `96` 就位，剩余元素下滤 |
+| 2 | 堆顶 `91` ↔ 末尾 `81` | `91` 就位，继续下滤 |
+| … | 重复 | 直至全部有序 |
 
 ## 性质
 
@@ -72,45 +76,15 @@ $O(1)$。直接在原数组上建堆与下滤，仅常数辅助变量。
 
 > 源码: https://github.com/lllllan02/ciu/tree/master/code/heap-sort
 
-### 基础写法
-
-本仓库实现。Floyd 自底向上建堆 + 反复取堆顶，`heapify` 与 [大顶堆](/dsa/trees/max-heap) 中的 `sift_down` 逻辑一致：
+本仓库实现。Floyd 自底向上建堆 + 反复取堆顶；下滤时若父节点已不小于较大子节点则 **提前返回**：
 
 ```c
-static int left(int i)  { return i * 2 + 1; }
-static int right(int i) { return i * 2 + 2; }
-static int parent(int i){ return (i - 1) / 2; }
-
-static void heapify(int *arr, int start, int end) {
-    while (start < end) {
-        int down = start;
-        int l = left(down), r = right(down);
-        if (l <= end && arr[down] < arr[l]) down = l;
-        if (r <= end && arr[down] < arr[r]) down = r;
-        if (down == start) break;
-        swap(arr + start, arr + down);
-        start = down;
-    }
+static void swap(int* a, int* b) {
+    int tmp = *a;
+    *a = *b;
+    *b = tmp;
 }
 
-void heap_sort(int *arr, int len) {
-    int end = parent(len - 1);
-    for (int i = end; i >= 0; i--) {
-        heapify(arr, i, len - 1);
-    }
-
-    for (int i = len - 1; i > 0; i--) {
-        swap(arr, arr + i);
-        heapify(arr, 0, i - 1);
-    }
-}
-```
-
-### 优化写法
-
-下滤时若父节点已不小于较大子节点则 **提前返回**，减少无效循环（思路同 OI Wiki 的 `sift_down`）：
-
-```c
 static void sift_down(int *arr, int start, int end) {
     int parent = start;
     int child = parent * 2 + 1;
@@ -120,14 +94,26 @@ static void sift_down(int *arr, int start, int end) {
         }
         if (arr[parent] >= arr[child]) return;
 
-        swap(arr + parent, arr + child]);
+        swap(arr + parent, arr + child);
         parent = child;
         child = parent * 2 + 1;
     }
 }
-```
 
-建堆与排序阶段将 `heapify` 替换为 `sift_down` 即可，整体复杂度不变。
+void heap_sort(int *arr, int len) {
+    if (len <= 1) return;
+
+    int end = (len - 2) / 2;
+    for (int i = end; i >= 0; i--) {
+        sift_down(arr, i, len - 1);
+    }
+
+    for (int i = len - 1; i > 0; i--) {
+        swap(arr, arr + i);
+        sift_down(arr, 0, i - 1);
+    }
+}
+```
 
 ## 参考阅读
 

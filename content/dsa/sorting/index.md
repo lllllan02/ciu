@@ -1,6 +1,5 @@
 ---
 title: 排序
-description: 比较排序、稳定性与线性时间排序。
 order: 4
 ---
 
