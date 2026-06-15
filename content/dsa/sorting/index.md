@@ -9,6 +9,8 @@ order: 4
 
 若两个键相等的对象在排序输出中与输入数据集中的顺序相同，则称该排序算法是**稳定的**（常见面试题：「快排是稳定的吗？」——标准实现不是）。
 
+快速判断时盯住 **相等键** 会不会被 **交换**，或 **一次移动跨越多个位置**？若是，相对顺序就可能被打乱，算法 **不稳定**。
+
 - [x] [排序算法的稳定性](https://en.wikipedia.org/wiki/Sorting_algorithm#Stability) (2026-06-09)
 - [x] [排序算法的稳定性](http://www.geeksforgeeks.org/stability-in-sorting-algorithms/) (2026-06-09)
 - [ ] [排序算法的稳定性](http://stackoverflow.com/questions/1517793/stability-in-sorting-algorithms)
@@ -21,11 +23,11 @@ order: 4
 | [冒泡排序](/dsa/sorting/bubble-sort) | $O(n^2)$ | $O(n)$ | $O(n^2)$ | $O(1)$ | 原地 | **稳定** |
 | [选择排序](/dsa/sorting/selection-sort) | $O(n^2)$ | $O(n^2)$ | $O(n^2)$ | $O(1)$ | 原地 | 不稳定 |
 | [插入排序](/dsa/sorting/insertion-sort) | $O(n^2)$ | $O(n)$ | $O(n^2)$ | $O(1)$ | 原地 | **稳定** |
-| [希尔排序](/dsa/sorting/shell-sort) | $O(n \log n)$ | $O(n \log^2 n)$ | $O(n \log^2 n)$ | $O(1)$ | 原地 | 不稳定 |
+| [希尔排序](/dsa/sorting/shell-sort) | $O(n \log n)$ ~ $O(n^{3/2})$ | $O(n \log n)$ | $O(n^2)$ | $O(1)$ | 原地 | 不稳定 |
 | [归并排序](/dsa/sorting/merge-sort) | $O(n \log n)$ | $O(n \log n)$ | $O(n \log n)$ | $O(n)$ | 非原地 | **稳定** |
 | [快速排序](/dsa/sorting/quick-sort) | $O(n \log n)$ | $O(n \log n)$ | $O(n^2)$ | $O(\log n)$ | 原地 | 不稳定 |
 | [堆排序](/dsa/sorting/heap-sort) | $O(n \log n)$ | $O(n \log n)$ | $O(n \log n)$ | $O(1)$ | 原地 | 不稳定 |
-| [计数排序](/dsa/sorting/counting-sort) | $O(n + k)$ | $O(n + k)$ | $O(n + k)$ | $O(k)$ | 非原地 | **稳定** |
+| [计数排序](/dsa/sorting/counting-sort) | $O(n + k)$ | $O(n + k)$ | $O(n + k)$ | $O(n + k)$ | 非原地 | **稳定** |
 | [桶排序](/dsa/sorting/bucket-sort) | $O(n + k)$ | $O(n + k)$ | $O(n^2)$ | $O(n + k)$ | 非原地 | **稳定** |
 | [基数排序](/dsa/sorting/radix-sort) | $O(n \times k)$ | $O(n \times k)$ | $O(n \times k)$ | $O(n + k)$ | 非原地 | **稳定** |
 

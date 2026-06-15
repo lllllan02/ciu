@@ -9,6 +9,8 @@ order: 5
 
 与[快排](/dsa/sorting/quick-sort)相比，归并排序的时间复杂度 **稳定** 为 $O(n \log n)$，不依赖输入分布；代价是数组实现通常需要 $O(n)$ 辅助缓冲区。在链表上通过改指针完成合并，无需额外数组，是对链表做通用排序的推荐方式。
 
+**特性**：平均 $O(n \log n)$ · 最好 $O(n \log n)$ · 最坏 $O(n \log n)$ · 空间 $O(n)$ · 非原地 · **稳定**
+
 ## 过程
 
 工作原理：分治三步——**切分**、**递归排序**、**合并**。
@@ -31,15 +33,6 @@ order: 5
  /  \
 [3] [44]
 ```
-
-自底向上合并：
-
-| 步骤 | 左段 | 右段 | 合并结果 |
-| :--- | :--- | :--- | :--- |
-| 1 | `[3]` | `[44]` | `[3, 44]` |
-| 2 | `[3, 44]` | `[38]` | `[3, 38, 44]` |
-| 3 | `[5]` | `[47]` | `[5, 47]` |
-| 4 | `[3, 38, 44]` | `[5, 47]` | `[3, 5, 38, 44, 47]` |
 
 ## 性质
 
@@ -64,11 +57,9 @@ order: 5
 
 ## 代码实现
 
-### 基础写法（数组 · 递归 · 自顶向下）
+### 基础写法（数组 · 递归 · 自顶向下）([源码](https://github.com/lllllan02/ciu/tree/master/code/merge-sort-recur))
 
-> 源码: https://github.com/lllllan02/ciu/tree/master/code/merge-sort-recur
-
-以 `mid` 切分后递归排序再合并，思路最贴近分治定义：
+以 `mid` 切分后递归排序再合并：
 
 ```c
 static void merge_sort_recur(int *src, int *dst, int len) {
@@ -93,9 +84,7 @@ static void merge_sort_recur(int *src, int *dst, int len) {
 }
 ```
 
-### 优化写法（数组 · 自底向上）
-
-> 源码: https://github.com/lllllan02/ciu/tree/master/code/merge-sort
+### 优化写法（数组 · 自底向上）([源码](https://github.com/lllllan02/ciu/tree/master/code/merge-sort))
 
 段长从 1 倍增逐轮两两合并，纯循环实现，避免递归栈开销：
 
@@ -112,6 +101,7 @@ for (int seg = 1; seg < len; seg <<= 1) {
         while (s1 < e1) dst[index++] = src[s1++];
         while (s2 < e2) dst[index++] = src[s2++];
     }
+
     // 交换 src / dst
 }
 
@@ -122,9 +112,7 @@ if (src != arr) {
 }
 ```
 
-### 链表实现
-
-> 源码: https://github.com/lllllan02/ciu/tree/master/code/merge-sort-linked-list
+### 链表实现([源码](https://github.com/lllllan02/ciu/tree/master/code/merge-sort-linked-list))
 
 快慢指针切分，递归排序后按值拼接，无需 $O(n)$ 辅助数组：
 
