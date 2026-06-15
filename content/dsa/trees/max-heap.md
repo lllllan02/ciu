@@ -3,33 +3,19 @@ title: 大顶堆
 order: 3
 ---
 
-> 源码: https://github.com/lllllan02/ciu/tree/master/code/max-heap
->
-> 参考: [OI Wiki - 二叉堆](https://oi-wiki.org/ds/binary-heap/)、[Hello Algo - 堆](https://www.hello-algo.com/chapter_heap/heap/)
-
 大顶堆（Max Heap）是一种 **二叉堆**，用完全二叉树组织数据，并满足 **堆序性**：每个节点的值 **不小于** 其左右孩子的值。因此堆顶（根节点）始终是全局最大值。
 
 本实现采用 **数组存储** 的定容二叉堆，通过 `sift_up` / `sift_down` 维护堆性质，支持 $O(\log n)$ 的插入与删除最大值。
 
-## 核心概念
+**特性**：`push` / `pop` $O(\log n)$ · `top` $O(1)$ · 空间 $O(n)$ · 定容数组
 
-### 完全二叉树
+## 完全二叉树与堆序性
 
-堆在逻辑上是一棵完全二叉树：除最后一层外每层均满，最后一层节点从左到右连续排列。这一性质使得树可以用 **一维数组** 紧凑表示，无需指针。
+堆在逻辑上是一棵 **完全二叉树**：除最后一层外每层均满，最后一层节点从左到右连续排列。大顶堆要求每个节点 **不小于** 其左右孩子；中序遍历 **不保证** 有序，但根始终是最大值。
 
-### 堆序性（大顶堆）
+## 数组表示
 
-对任意下标 $i$（$i > 0$）：
-
-$$
-\text{data}[\text{parent}(i)] \ge \text{data}[i]
-$$
-
-等价地，每个节点都不小于其孩子。中序遍历 **不保证** 有序，但根始终是最大值。
-
-### 数组下标关系
-
-对下标为 $i$ 的节点（根为 0）：
+完全二叉树可压平为一维数组，根下标为 0：
 
 | 关系 | 公式 |
 | :--- | :--- |
@@ -37,47 +23,25 @@ $$
 | 右孩子 | $2i + 2$ |
 | 父节点 | $\lfloor (i - 1) / 2 \rfloor$ |
 
-本实现中的辅助函数：
+`MaxHeap` 用 `data` 数组存元素，`size` 为当前个数，`capacity` 为容量（满时 `push` 触发断言）。
+
+## [代码实现](https://github.com/lllllan02/ciu/tree/master/code/max-heap)
+
+`push` 将新元素放到数组末尾后 **上滤**；`pop` 将末尾元素移到堆顶后 **下滤**：
 
 ```c
-static int left(int i)   { return i * 2 + 1; }
-static int right(int i)  { return i * 2 + 2; }
-static int parent(int i) { return (i - 1) / 2; }
-```
+void push(MaxHeap* heap, int value) {
+    heap->data[heap->size++] = value;
+    sift_up(heap, heap->size - 1);
+}
 
-## 数据结构
+int pop(MaxHeap* heap) {
+    int t = top(heap);
+    heap->data[0] = heap->data[--heap->size];
+    sift_down(heap, 0);
+    return t;
+}
 
-```c
-typedef struct MaxHeap {
-    int* data;
-    int size;
-    int capacity;
-} MaxHeap;
-```
-
-- `data`：存储堆元素的数组，下标 0 为堆顶。
-- `size`：当前元素个数。
-- `capacity`：数组容量（定容，满时 `push` 触发断言）。
-
-## API
-
-| 函数 | 说明 |
-| :--- | :--- |
-| `create_max_heap(capacity)` | 创建定容大顶堆 |
-| `destroy_max_heap(heap)` | 释放堆 |
-| `push(heap, value)` | 插入元素，$O(\log n)$ |
-| `pop(heap)` | 删除并返回最大值，$O(\log n)$ |
-| `top(heap)` | 返回堆顶（最大值），不删除 |
-| `size(heap)` | 当前元素个数 |
-| `is_empty(heap)` | 是否为空 |
-| `is_full(heap)` | 是否已满 |
-
-### 插入（push）
-
-1. 将新元素放到数组末尾（完全二叉树的下一个叶子位置），`size++`。
-2. 从该位置 **向上调整（sift up）**：若当前值大于父节点则交换，直到满足堆序性或到达根。
-
-```c
 static void sift_up(MaxHeap* h, int i) {
     while (i > 0) {
         int p = parent(i);
@@ -86,15 +50,7 @@ static void sift_up(MaxHeap* h, int i) {
         i = p;
     }
 }
-```
 
-### 删除最大值（pop）
-
-1. 保存堆顶 `data[0]` 作为返回值。
-2. 将 **最后一个元素** 移到堆顶，`size--`。
-3. 从堆顶 **向下调整（sift down）**：与左右孩子中较大者交换，直到满足堆序性或成为叶子。
-
-```c
 static void sift_down(MaxHeap* h, int i) {
     while (true) {
         int l = left(i), r = right(i), down = i;
@@ -107,7 +63,7 @@ static void sift_down(MaxHeap* h, int i) {
 }
 ```
 
-连续 `pop` 会按 **降序** 输出所有元素，这也是 **堆排序** 的核心思路。
+连续 `pop` 会按 **降序** 输出所有元素，这也是 [堆排序](/dsa/sorting/heap-sort) 的核心思路；一次性建堆见 [线性时间构建堆](/dsa/trees/build-heap)。
 
 ## 复杂度分析
 
@@ -131,12 +87,9 @@ static void sift_down(MaxHeap* h, int i) {
 | 取最值 | `top` / `pop` | `top` / `pop` |
 | 插入 | `push` | `push` |
 
-## 测试
+## 参考阅读
 
-```bash
-cd code/max-heap
-gcc -Wall -Wextra -std=c11 -o main main.c
-./main
-```
-
-测试覆盖：创建与销毁、`push` / `pop` / `top`、`is_empty` / `is_full` / `size`，以及每次操作后堆序性的校验（每个节点不小于其左右孩子）。
+- [x] [OI Wiki - 二叉堆](https://oi-wiki.org/ds/binary-heap/) (2026-06-08)
+- [x] [Hello Algo - 堆](https://www.hello-algo.com/chapter_heap/heap/) (2026-06-08)
+- [x] [线性时间构建堆](/dsa/trees/build-heap) (2026-06-09)
+- [x] [堆排序](/dsa/sorting/heap-sort) (2026-06-09)

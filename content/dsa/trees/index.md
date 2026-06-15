@@ -1,6 +1,5 @@
 ---
 title: 树
-description: 树遍历、BST、堆与优先级队列。
 order: 3
 ---
 
