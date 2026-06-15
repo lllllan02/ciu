@@ -151,6 +151,12 @@
       "commit": "0d448f38a24c568c5539ff2cd57d813293430ccd",
       "installedAt": "2026-05-24T15:36:17.005Z"
     },
+    "heading-format": {
+      "source": "github:quartz-lib/heading-format",
+      "resolved": "https://github.com/quartz-lib/heading-format.git",
+      "commit": "0a9d130bf9c656c846f24de2adae3f82b984fd1a",
+      "installedAt": "2026-06-15T09:26:51.621Z"
+    },
     "index-content-page": {
       "source": "github:quartz-lib/index-content-page",
       "resolved": "https://github.com/quartz-lib/index-content-page.git",

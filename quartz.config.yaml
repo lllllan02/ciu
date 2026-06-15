@@ -262,6 +262,11 @@ plugins:
       foldersFirst: true
       missingOrderPlacement: end
     order: 60
+  - source: github:quartz-lib/heading-format
+    enabled: true
+    options:
+      style: gradient
+    order: 50
 layout:
   groups:
     toolbar:

@@ -1,28 +1,69 @@
 ---
 title: 图
-description: 表示法、BFS/DFS、最短路与最小生成树。
 order: 5
 ---
 
 图用来表示节点（顶点）与边之间的关系，是计算机科学中许多问题的自然建模方式；本节内容较多，建议先掌握表示法与遍历，再深入最短路与最小生成树。
 
-### 核心概念
+## 核心概念
 
-- 有 4 种基本方式在内存里表示一个图：
-    - 对象和指针
-    - 邻接矩阵
-    - 邻接表
-    - 邻接图
-- 熟悉以上每一种图的表示法，并了解各自的优缺点
-- 广度优先搜索和深度优先搜索：知道它们的计算复杂度和设计上的权衡以及如何用代码实现它们
-- 遇到一个问题时，首先尝试基于图的解决方案，如果没有再去尝试其他的
+- 对象和指针
+- [x] [邻接表](https://baike.baidu.com/item/%E9%82%BB%E6%8E%A5%E8%A1%A8/9796152) (2026-06-15)
+- [x] [邻接矩阵](https://baike.baidu.com/item/%E9%82%BB%E6%8E%A5%E7%9F%A9%E9%98%B5/9796080) (2026-06-15)
+- 邻接图
 
-### MIT 课程
+## 深度优先搜索
+
+- [x] [OI Wiki - 深度优先搜索](https://oi-wiki.org/graph/dfs/) (2026-06-15)
+
+> - [x] [实现 DFS 邻接表 (递归)](https://github.com/lllllan02/ciu/tree/master/code/dfs-list)
+> - [ ] DFS 邻接表 (栈迭代)
+> - [ ] DFS 邻接矩阵 (递归)
+> - [ ] DFS 邻接矩阵 (栈迭代)
+
+### 拓扑排序
+
+- [x] [OI Wiki - 拓扑排序 DFS 算法](https://oi-wiki.org/graph/topo/#dfs-%E7%AE%97%E6%B3%95) (2026-06-15)
+
+### 强连通分量
+
+- [x] [百度百科 - 强连通分量](https://baike.baidu.com/item/%E5%BC%BA%E8%BF%9E%E9%80%9A%E5%88%86%E9%87%8F/7448759) (2026-06-15)
+- [x] [OI Wiki - Tarjan 算法](https://oi-wiki.org/graph/scc/#tarjan-%E7%AE%97%E6%B3%95) (2026-06-15)
+
+## 最短路径 
+
+### Dijkstra 算法
+
+- [x] [OI Wiki - 最短路径 Dijkstra 算法](https://oi-wiki.org/graph/shortest-path/#dijkstra-%E7%AE%97%E6%B3%95) (2026-06-15)
+
+> - [x] [实现 Dijkstra 算法](/dsa/graphs/dijkstra) (2026-06-15) 
+
+## 最小生成树 
+
+### Prim 算法
+
+- [x] [OI Wiki - 最小生成树 Prim 算法](https://oi-wiki.org/graph/mst/#prim-%E7%AE%97%E6%B3%95) (2026-06-15)
+
+## 动手实现
+
+- [ ] BFS 邻接表
+- [ ] BFS 邻接矩阵
+- [ ] 最小生成树
+- 基于 DFS 的算法 (根据上文 Aduni 的视频):
+    - [ ] 检查环 (我们会先检查是否有环存在以便做拓扑排序)
+    - [ ] 拓扑排序
+    - [ ] 计算图中的连通分支
+    - [ ] 列出强连通分量
+    - [ ] 检查双向图
+
+## 视频课程
+
+MIT 课程
 
 - [广度优先搜索](https://www.youtube.com/watch?v=s-CYnVz-uh4&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb&index=13)
 - [深度优先搜索](https://www.youtube.com/watch?v=AfSk24UTFS8&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb&index=14)
 
-### Skiena 课程
+Skiena 课程
 
 - [ ] [CSE373 2012 - 课程 11 - 图的数据结构（视频）](https://www.youtube.com/watch?v=OiXxhDrFruw&list=PLOtl7M3yp-DV69F32zdK7YJcNXpTunF2b&index=11)
 - [ ] [CSE373 2012 - 课程 12 - 广度优先搜索（视频）](https://www.youtube.com/watch?v=g5vF8jscteo&list=PLOtl7M3yp-DV69F32zdK7YJcNXpTunF2b&index=12)
@@ -31,7 +72,7 @@ order: 5
 - [ ] [CSE373 2012 - 课程 15 - 图的算法 (2)（视频）](https://www.youtube.com/watch?v=ia1L30l7OIg&index=15&list=PLOtl7M3yp-DV69F32zdK7YJcNXpTunF2b)
 - [ ] [CSE373 2012 - 课程 16 - 图的算法 (3)（视频）](https://www.youtube.com/watch?v=jgDOQq6iWy8&index=16&list=PLOtl7M3yp-DV69F32zdK7YJcNXpTunF2b)
 
-### 复习与经典算法
+复习与经典算法
 
 - [ ] [6.006 单源最短路径问题（视频）](https://www.youtube.com/watch?v=Aa2sqUhIn-E&index=15&list=PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb)
 - [ ] [6.006 Dijkstra 算法（视频）](https://www.youtube.com/watch?v=NSHizBK9JD8&t=1731s&ab_channel=MITOpenCourseWare)
@@ -47,23 +88,6 @@ order: 5
 - [ ] [[复习] 最短路径算法（播放列表）16 分钟（视频）](https://www.youtube.com/playlist?list=PL9xmBV_5YoZO-Y-H3xIC9DGSfVYJng9Yw)
 - [ ] [[复习] 最小生成树（播放列表）4 分钟（视频）](https://www.youtube.com/playlist?list=PL9xmBV_5YoZObEi3Hf6lmyW-CBfs7nkOV)
 
-### Coursera 课程
+Coursera 课程
 
 - [ ] [图的算法（视频）](https://www.coursera.org/learn/algorithms-on-graphs/home/welcome)
-
-### 动手实现
-
-- [ ] DFS 邻接表 (递归)
-- [ ] DFS 邻接表 (栈迭代)
-- [ ] DFS 邻接矩阵 (递归)
-- [ ] DFS 邻接矩阵 (栈迭代)
-- [ ] BFS 邻接表
-- [ ] BFS 邻接矩阵
-- [ ] 单源最短路径问题 (Dijkstra)
-- [ ] 最小生成树
-- 基于 DFS 的算法 (根据上文 Aduni 的视频):
-    - [ ] 检查环 (我们会先检查是否有环存在以便做拓扑排序)
-    - [ ] 拓扑排序
-    - [ ] 计算图中的连通分支
-    - [ ] 列出强连通分量
-    - [ ] 检查双向图
