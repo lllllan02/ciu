@@ -36,13 +36,25 @@ order: 5
 
 ## 最短路径
 
+### Floyd 算法
+
+- [x] [OI Wiki - 最短路径 Floyd 算法](https://oi-wiki.org/graph/shortest-path/#floyd-%E7%AE%97%E6%B3%95) (2026-06-16)
+
+> - [x] [实现 Floyd 算法](https://github.com/lllllan02/ciu/tree/master/code/floyd) (2026-06-16)
+
+### Bellman-Ford 算法
+
+- [x] [Bellman-Ford 算法](https://www.geeksforgeeks.org/bellman-ford-algorithm-dp-23/) (2026-06-16)
+
+> - [x] [实现 Bellman-Ford 算法](/dsa/graphs/bellman-ford) (2026-06-16)
+
 ### Dijkstra 算法
 
 - [x] [OI Wiki - 最短路径 Dijkstra 算法](https://oi-wiki.org/graph/shortest-path/#dijkstra-%E7%AE%97%E6%B3%95) (2026-06-15)
 
-> - [x] [实现 Dijkstra 算法](/dsa/graphs/dijkstra) (2026-06-15) 
+> - [x] [实现 Dijkstra 算法](/dsa/graphs/dijkstra) (2026-06-16)
 
-## 最小生成树 
+## 最小生成树
 
 ### Prim 算法
 
