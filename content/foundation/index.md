@@ -1,6 +1,5 @@
 ---
 title: 基础理论
-description: 算法复杂度分析与 Big-O 记号。
 order: 1
 ---
 
@@ -17,5 +16,3 @@ order: 1
 - [ ] [UC Berkeley CS61B - 大 O 符号（视频）](https://archive.org/details/ucberkeley_webcast_VIS4YDpuP98)
 - [ ] [TopCoder - 计算复杂性：第 1 部分](https://www.topcoder.com/thrive/articles/Computational%20Complexity%20part%20one) + [第 2 部分](https://www.topcoder.com/thrive/articles/Computational%20Complexity%20part%20two)（包括递归关系和主定理）
 - [ ] [Big-O 速查表](http://bigocheatsheet.com/)
-
----

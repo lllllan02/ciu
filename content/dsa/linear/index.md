@@ -1,12 +1,9 @@
 ---
 title: 线性结构
-description: 数组、链表、栈、队列、哈希表。
 order: 1
 ---
 
-线性结构（数组、链表、栈、队列）与基于哈希的映射是后续树、图和算法题的基础。
-
-### 数组（Arrays）
+## 数组（Arrays）
 
 数组把元素放在**连续内存**里，用下标可在 $O(1)$ 时间内随机访问任意位置；在末尾增删通常也很快，但在中间插入或删除需要挪动后面的元素，一般是 $O(n)$。固定长度的数组容量写死；**动态数组**在元素变多时自动扩容（常见做法是容量翻倍），是多数语言里 `vector`、列表等容器的底层思路。
 
@@ -18,7 +15,7 @@ order: 1
 
 > - [x] [实现动态数组](/dsa/linear/arrays) (2026-02-01)
 
-### 链表（Linked Lists）
+## 链表（Linked Lists）
 
 链表由一个个**节点**串成，每个节点存数据和指向下一个节点的指针；元素在内存里不必连续。已知位置时，在头尾或中间插入、删除往往只需改指针，是 $O(1)$；但按序号访问要从头往后走，是 $O(n)$。**单向链表**只指向前驱；**双向链表**多一个指向前节点的指针，便于从尾部往前删改，代价是每个节点多占一点空间。
 
@@ -35,7 +32,7 @@ order: 1
 
 > - [x] [实现单向链表](/dsa/linear/linked-lists) (2026-02-28)
 
-### 堆栈（Stack）
+## 堆栈（Stack）
 
 堆栈是一种 **后进先出（LIFO）** 的线性结构：只在同一端压入（push）和弹出（pop），查看栈顶也是 $O(1)$。用数组或链表都能实现，数组版更简单。常见于函数调用栈、括号匹配、DFS、撤销操作等「先处理最近压入的」场景。
 
@@ -44,7 +41,7 @@ order: 1
 
 可以不实现，因为使用数组来实现是微不足道的事。
 
-### 队列（Queue）
+## 队列（Queue）
 
 队列是一种 **先进先出（FIFO）** 的线性结构：从一端入队（enqueue）、另一端出队（dequeue），两端操作都是 $O(1)$。与堆栈相对，适合 BFS、任务调度、消息缓冲等「先来的先处理」场景。用数组实现时常配合**循环队列**，避免频繁搬移元素；用链表实现则头尾各维护指针即可。
 
@@ -54,7 +51,7 @@ order: 1
 
 > - [x] [实现队列](/dsa/linear/queue) (2026-03-04)
 
-### 哈希表（Hash table）
+## 哈希表（Hash table）
 
 哈希表用**哈希函数**把键映射到桶下标，在理想情况下插入、查找、删除的平均时间都是 $O(1)$。不同键可能落到同一位置（冲突），常见处理方式是**链式法**（每个桶挂链表）或**开放寻址**（在表里探测下一个空位）。语言里的 `dict` / `map`、缓存、计数表等都依赖这一结构；负载因子过高时要扩容并 rehash。
 
@@ -72,7 +69,7 @@ order: 1
 - [ ] [数据结构（视频）](https://www.coursera.org/learn/data-structures/home/week/4)
 - [ ] [电话簿问题（视频）](https://www.coursera.org/lecture/data-structures/phone-book-problem-NYZZP)
 
-#### 分布式哈希表
+### 分布式哈希表
 
 - [ ] [Dropbox 中的即时上传和存储优化（视频）](https://www.coursera.org/lecture/data-structures/instant-uploads-and-storage-optimization-in-dropbox-DvaIb)
 - [ ] [分布式哈希表（视频）](https://www.coursera.org/lecture/data-structures/distributed-hash-tables-tvH8H)
