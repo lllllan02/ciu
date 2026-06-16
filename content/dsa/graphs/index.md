@@ -21,11 +21,6 @@ order: 5
 > - [ ] DFS 邻接矩阵 (递归)
 > - [ ] DFS 邻接矩阵 (栈迭代)
 
-### 强连通分量
-
-- [x] [百度百科 - 强连通分量](https://baike.baidu.com/item/%E5%BC%BA%E8%BF%9E%E9%80%9A%E5%88%86%E9%87%8F/7448759) (2026-06-15)
-- [x] [OI Wiki - Tarjan 算法](https://oi-wiki.org/graph/scc/#tarjan-%E7%AE%97%E6%B3%95) (2026-06-15)
-
 ## 拓扑排序
 
 - [x] [OI Wiki - 拓扑排序 DFS 算法](https://oi-wiki.org/graph/topo/#dfs-%E7%AE%97%E6%B3%95) (2026-06-15)
@@ -53,6 +48,16 @@ order: 5
 - [x] [OI Wiki - 最短路径 Dijkstra 算法](https://oi-wiki.org/graph/shortest-path/#dijkstra-%E7%AE%97%E6%B3%95) (2026-06-15)
 
 > - [x] [实现 Dijkstra 算法](/dsa/graphs/dijkstra) (2026-06-16)
+
+## 强连通分量
+
+- [x] [百度百科 - 强连通分量](https://baike.baidu.com/item/%E5%BC%BA%E8%BF%9E%E9%80%9A%E5%88%86%E9%87%8F/7448759) (2026-06-15)
+
+### Tarjan 算法
+
+- [x] [OI Wiki - Tarjan 算法](https://oi-wiki.org/graph/scc/#tarjan-%E7%AE%97%E6%B3%95) (2026-06-15)
+
+> - [x] [实现 Tarjan 算法](/dsa/graphs/tarjan) (2026-06-16)
 
 ## 最小生成树
 
