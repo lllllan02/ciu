@@ -21,6 +21,13 @@ order: 5
 > - [ ] DFS 邻接矩阵 (递归)
 > - [ ] DFS 邻接矩阵 (栈迭代)
 
+## 广度优先搜索
+
+- [x] [OI Wiki - 广度优先搜索](https://oi-wiki.org/graph/bfs/) (2026-06-16)
+
+> - [x] [实现 BFS 邻接表](https://github.com/lllllan02/ciu/tree/master/code/bfs-list) (2026-06-16)
+> - [ ] BFS 邻接矩阵
+
 ## 拓扑排序
 
 - [x] [OI Wiki - 拓扑排序 DFS 算法](https://oi-wiki.org/graph/topo/#dfs-%E7%AE%97%E6%B3%95) (2026-06-15)
@@ -61,14 +68,14 @@ order: 5
 
 ## 最小生成树
 
+### Kruskal 算法
+
 ### Prim 算法
 
 - [x] [OI Wiki - 最小生成树 Prim 算法](https://oi-wiki.org/graph/mst/#prim-%E7%AE%97%E6%B3%95) (2026-06-15)
 
 ## 动手实现
 
-- [ ] BFS 邻接表
-- [ ] BFS 邻接矩阵
 - [ ] 最小生成树
 - 基于 DFS 的算法 (根据上文 Aduni 的视频):
     - [ ] 检查环 (我们会先检查是否有环存在以便做拓扑排序)
