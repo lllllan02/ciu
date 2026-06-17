@@ -331,7 +331,7 @@ func cloneViaJSON[T any](src T) (T, error) {
 3. **与工厂 / 生成器分工不同**：工厂选型、生成器拼母版、原型在运行时复制母版。
 4. **Go 无内置克隆**：`Clone()` 的质量决定模式是否成立；切片、map、指针要逐项处理。
 
-上一篇的 [生成器模式](/cs-fundamentals/design-patterns/builder) 管 **单个复杂对象分步构建**；本篇管 **从已有实例安全复制**。字段从零拼 → 生成器；同一模板发一千次 → 原型。
+上一篇的 [生成器模式](/cs-fundamentals/design-patterns/builder) 管 **单个复杂对象分步构建**；本篇管 **从已有实例安全复制**。字段从零拼 → 生成器；同一模板发一千次 → 原型。下一篇 [单例模式](/cs-fundamentals/design-patterns/singleton) 管 **全局唯一的派发枢纽**。
 
 ## 参考阅读
 

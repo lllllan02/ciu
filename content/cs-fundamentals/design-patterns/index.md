@@ -40,6 +40,7 @@ order: 1
 | [抽象工厂模式](/cs-fundamentals/design-patterns/abstract-factory) | 提供创建一系列相关或相互依赖对象的接口，而无需指定它们具体的类。 |
 | [生成器模式](/cs-fundamentals/design-patterns/builder) | 分步骤构建复杂对象，将构建过程与最终表示分离。 |
 | [原型模式](/cs-fundamentals/design-patterns/prototype) | 通过复制已有实例创建新对象，将克隆过程与使用过程分离。 |
+| [单例模式](/cs-fundamentals/design-patterns/singleton) | 保证一个类仅有一个实例，并提供一个访问它的全局访问点。 |
 
 ## 其他资源
 
