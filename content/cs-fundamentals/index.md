@@ -6,29 +6,7 @@ order: 3
 
 ## 设计模式
 
-- [ ] [UML 统一建模语言概览 (视频)](https://www.youtube.com/watch?v=3cmzqZzwNDM&list=PLGLfVvz_LVvQ5G-LdJ8RLqe-ndo7QITYc&index=3)
-- [ ] 主要有如下的设计模式:
-    - [ ] 策略模式（strategy）
-    - [ ] 单例模式（singleton）
-    - [ ] 适配器模式（adapter）
-    - [ ] 原型模式（prototype）
-    - [ ] 装饰器模式（decorator）
-    - [ ] 访问者模式（visitor）
-    - [ ] 工厂模式，抽象工厂模式（factory, abstract factory）
-    - [ ] 外观模式（facade）
-    - [ ] 观察者模式（observer）
-    - [ ] 代理模式（proxy）
-    - [ ] 委托模式（delegate）
-    - [ ] 命令模式（command）
-    - [ ] 状态模式（state）
-    - [ ] 备忘录模式（memento）
-    - [ ] 迭代器模式（iterator）
-    - [ ] 组合模式（composite）
-    - [ ] 享元模式（flyweight）
-- [ ] [系列视频（27 个）](https://www.youtube.com/playlist?list=PLF206E906175C7E07)
-- [ ] [书籍：《Head First 设计模式》](https://www.amazon.com/Head-First-Design-Patterns-Freeman/dp/0596007124)
-    - I know the canonical book is "Design Patterns: Elements of Reusable Object-Oriented Software", but Head First is great for beginners to OO.
-- [Handy reference: 101 Design Patterns & Tips for Developers](https://sourcemaking.com/design-patterns-and-tips)
+见 [设计模式](/cs-fundamentals/design-patterns)。
 
 ## 组合（Combinatorics）与概率（Probability）
 
