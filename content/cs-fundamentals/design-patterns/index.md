@@ -30,6 +30,15 @@ order: 1
 - [x] [菜鸟教程 - 设计模式介绍](https://www.runoob.com/design-pattern/design-pattern-intro.html) (2026-06-17)
 - [x] [Refactoring.Guru - 设计模式](https://refactoringguru.cn/design-patterns) (2026-06-17)
 
+## 设计模式
+
+### 创建型模式
+
+| 模式 | 描述 |
+| :--- | :--- |
+| [工厂方法模式](/cs-fundamentals/design-patterns/factory) | 提供一种创建对象的方式，使创建过程与使用过程分离。 |
+| [抽象工厂模式](/cs-fundamentals/design-patterns/abstract-factory) | 提供创建一系列相关或相互依赖对象的接口，而无需指定它们具体的类。 |
+
 ## 其他资源
 
 - [ ] [UML 统一建模语言概览 (视频)](https://www.youtube.com/watch?v=3cmzqZzwNDM&list=PLGLfVvz_LVvQ5G-LdJ8RLqe-ndo7QITYc&index=3)
