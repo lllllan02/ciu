@@ -47,6 +47,7 @@ order: 1
 | 模式 | 描述 |
 | :--- | :--- |
 | [适配器模式](/cs-fundamentals/design-patterns/adapter) | 将一个类的接口转换成客户期望的另一个接口，使原本因接口不兼容而不能一起工作的类可以一起工作。 |
+| [桥接模式](/cs-fundamentals/design-patterns/bridge) | 将抽象部分与实现部分分离，使它们都可以独立地变化。 |
 
 ## 其他资源
 
