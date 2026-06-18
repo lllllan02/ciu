@@ -42,6 +42,12 @@ order: 1
 | [原型模式](/cs-fundamentals/design-patterns/prototype) | 通过复制已有实例创建新对象，将克隆过程与使用过程分离。 |
 | [单例模式](/cs-fundamentals/design-patterns/singleton) | 保证一个类仅有一个实例，并提供一个访问它的全局访问点。 |
 
+### 结构型模式
+
+| 模式 | 描述 |
+| :--- | :--- |
+| [适配器模式](/cs-fundamentals/design-patterns/adapter) | 将一个类的接口转换成客户期望的另一个接口，使原本因接口不兼容而不能一起工作的类可以一起工作。 |
+
 ## 其他资源
 
 - [ ] [UML 统一建模语言概览 (视频)](https://www.youtube.com/watch?v=3cmzqZzwNDM&list=PLGLfVvz_LVvQ5G-LdJ8RLqe-ndo7QITYc&index=3)
