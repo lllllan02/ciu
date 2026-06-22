@@ -516,7 +516,7 @@ type InventoryHolder interface { ReserveInventory() error }
 3. **与组合正交**：组合是树 **包含** 子行；装饰是 **包装** 单行；child 可以是装饰过的 `ProductLine`。
 4. **别滥用**：跨行满减、复杂促销引擎不属于单行装饰；接口越来越胖时拆小接口或管道化。
 
-[组合模式](/cs-fundamentals/design-patterns/composite) 统一了 **订单明细树** 的遍历；装饰器模式统一了 **单行上的可选增强** 如何动态组合。放回电商订单系统这条主线：明细树搭好后，会员价、优惠券、礼品包装不必写进 `ProductLine` 子类，用装饰器在组装时一层层套上即可。
+[组合模式](/cs-fundamentals/design-patterns/composite) 统一了 **订单明细树** 的遍历；装饰器模式统一了 **单行上的可选增强** 如何动态组合。下一篇 [外观模式](/cs-fundamentals/design-patterns/facade) 关注 **下单用例** 如何穿过库存、支付、通知等子系统而不让每个入口重复编排。
 
 ## 参考阅读
 

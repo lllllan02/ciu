@@ -323,7 +323,7 @@ func (a *StripeAdapter) Pay(order Order) error {
 | :--- | :--- | :--- |
 | 目的 | 让 **现有** 接口符合 **客户端已定的** Target | **简化** 多个子系统，提供新的粗粒度入口 |
 | 接口 | 必须实现 Client 已有的 Target（如 `PaymentProcessor`） | 常定义全新 API（如 `CheckoutOrder(req)`） |
-| 典型场景 | Stripe SDK → `PaymentProcessor` | 支付 + 库存 + 发票 + 审计日志 → 一个 `CheckoutFacade` |
+| 典型场景 | Stripe SDK → `PaymentProcessor` | 支付 + 库存 + 发票 + 审计日志 → 一个 `CheckoutFacade`（见 [外观模式](/cs-fundamentals/design-patterns/facade)） |
 
 一个类可以同时「像适配器又像外观」——判断时看 **动机**：是为 **兼容旧接口**，还是为 **降低子系统使用复杂度**。
 
