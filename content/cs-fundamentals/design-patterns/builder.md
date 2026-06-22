@@ -3,93 +3,47 @@ title: 生成器模式
 order: 3
 ---
 
-**生成器模式**（GoF 称 **建造者模式**，Builder）提供一种 **分步骤构建复杂对象** 的方式，使 **构建过程与最终表示分离**：调用方按需设置各字段，最后统一 `Build()` 得到不可变或校验完备的产品；同一套构建步骤也可以产出不同配置的对象。
-
-在电商订单系统里，每条 `Order` 有买家、商品列表、优惠券、支付方式、收货地址、发票抬头、预约配送时间、元数据等字段，且大多可选——可以分步骤逐项设置，最后 `Build()` 得到完整订单；不必在构造函数里一次性塞十几个参数，也不必为每种组合写一个 `NewXxx()`。
-
-下文继续使用电商订单系统：支付渠道和套装已在组装层选好，本文关注 **单条订单如何一步步构建完整**，而不是选择哪种支付渠道或哪套产品族。
+**生成器模式**（GoF 称 **建造者模式**，Builder）的核心思路是 **分步骤填好复杂对象的各字段**，避免巨型构造函数。常见实现包括：单独生成器 + `Build()`、目标 struct 上的链式 setter、函数式选项等——本质都是把「怎么填」从一次传齐里拆出来，具体形态因项目而异。下文以链式写法为例演示其中一种。
 
 ## 问题
 
-业务里经常要构造 **字段多、可选参数多** 的对象。最直接的做法是 **巨型构造函数** 或 **参数列表很长的函数**：
+下单、发通知、拼 HTTP 请求——这类业务对象往往 **字段很多，且大半是可选的**：买家、商品、支付方式、优先级、定时发送…… 真正必填的通常只有其中几项。
+
+遇到这种情况，大家第一反应往往是写一个 **参数很多的构造函数**，调用时一次把所有字段传进去。只关心买家、正文和支付方式时，调用大概长这样：
 
 ```go
-type Order struct {
-    Buyer         []string
-    InvoiceTitle  []string
-    OrderTitle    string
-    Items         string
-    PaymentMethod string
-    Priority      int
-    DeliverAt     time.Time
-    Items         []string
-    Metadata      map[string]string
-}
-
-func NewOrder(
-    buyer []string,
-    invoiceTitle []string,
-    orderTitle, items, paymentMethod string,
-    priority int,
-    deliverAt time.Time,
-    items []string,
-    metadata map[string]string,
-) *Order {
-    return &Order{ /* … */ }
-}
-```
-
-调用方往往要传大量 `nil`、空字符串或零值占位：
-
-```go
-n := NewOrder(
-    []string{"user@example.com"},
-    nil, "", "", "alipay",
-    0, time.Time{}, nil, nil,
+order, err := NewOrder(
+    []string{"user@example.com"}, // 买家
+    nil,                          // 发票抬头
+    "",                           // 标题
+    "您的包裹正在途中…",              // 正文
+    "alipay",                     // 支付方式
+    0,                            // 优先级
+    time.Time{},                  // 定时发送
+    nil,                          // 附加商品
+    nil,                          // 扩展字段
 )
 ```
 
-字段一多，问题就会暴露：
+光从这一行调用，很难一眼看出哪个是买家、哪个是优先级；注释一多，反而更乱。字段再多一些，麻烦会一起冒出来：
 
-1. **可读性差**：十几个 positional 参数，调用处看不出哪个是 `InvoiceTitle`、哪个是 `Priority`。
-2. **组合爆炸**：为常见场景写 `NewUrgentOrder()`、`NewScheduledDeliveryOrder()` 等专用构造函数，数量随可选字段指数增长。
-3. **校验分散**：必填项（如 `Buyer`、`Items`）要在每个 `NewXxx()` 或调用方重复检查，容易漏。
-4. **构建过程与表示混在一起**：同一对象有时要「先设支付渠道再填订单明细」，有时要「从订单模板渲染再设买家」——全塞进一个构造函数，顺序和分支都挤在一起。
-5. **部分构建不安全**：对象构造到一半就被拿去用（缺字段），编译期发现不了。
+1. **看不清在填什么**：参数全靠 **位置** 区分，调用处要对着函数签名数「第几个才是 Priority」。
+2. **专用构造函数越写越多**：为了让「加急单」「定时单」好写一点，有人再加 `NewUrgentOrder()`、`NewScheduledOrder()`…… 可选字段一多，这种组合会 **越积越多**。
+3. **校验到处重复**：买家、商品明细等必填项，要在每个 `NewXxx` 或每个调用方自己检查一遍，漏一处就出 bug。
+4. **「怎么填」和「填完长什么样」搅在一起**：有时先定支付方式再填明细，有时从模板渲染再改标题——全塞进一个构造函数，顺序和分支都挤在一处，很难维护。
+5. **半完成对象也能被用**：对象还没填齐字段就能传出去，编译器不会拦，运行时才发现缺数据。
 
-本质矛盾是：**对象最终长什么样**（表示）和 **怎么一步步填好各字段**（构建过程）绑死在同一个构造函数里。
+本质矛盾是：**对象最终长什么样**（表示），和 **怎么一步步把它填好**（构建过程），被绑死在同一个构造函数里了。
 
 ## 意图
 
-用一句话说：**将一个复杂对象的构建与它的表示分离，使同样的构建过程可以创建不同的表示。**
+**把「怎么填」从巨型构造函数里拆出来，分步设置各字段。**
 
-调用方通过 **生成器** 按步骤设置字段；**构建**（校验、默认值、不可变拷贝）集中在 `Build()`；业务拿到的是完整、合法的产品。GoF 从 **实现结构** 角度的定义是：
-
-> 将一个复杂对象的构建与它的表示分离，使得同样的构建过程可以创建不同的表示。
-
-与 [工厂方法模式](/cs-fundamentals/design-patterns/factory) 的关系：
-
-| | 工厂方法 | 生成器 |
-| :--- | :--- | :--- |
-| 解决什么 | **创建哪一种** 产品（选型、解耦 `new`） | **如何一步步拼出** 一个复杂产品（多字段、多步骤） |
-| 典型入口 | `NewAlipayProcessor()` | `NewOrderBuilder().Buyer(...).Items(...).Build()` |
-| 产品复杂度 | 构造相对简单，类型种类多 | 往往 **一种** 产品，但字段多、可选组合多 |
-
-二者可以 **组合**：工厂方法决定造哪种 `PaymentProcessor`，生成器负责拼出要提交的 `Order` 请求体。
-
-> **命名说明**
->
-> - **生成器 / 建造者**（本文，GoF Builder）：分步设置 + `Build()`，构建与表示分离。
-> - **函数式选项**（Functional Options，Go 惯用法）：`NewOrder(WithBuyer(...), WithPriority(...))`——解决同类问题，见下文 [组装实践 · 函数式选项](#函数式选项)。
-> - **简单工厂 / 工厂方法**：管「造哪类对象」，不管「对象里十几个字段怎么填」。
+复杂对象不必一次传齐所有参数。调用方按需设置买家、支付方式、优先级等——只写关心的那几项，不必满屏 `nil` 占位。必填怎么约束、默认值放哪、最终在哪一步校验，可以放在 `New()`、`Build()`、`Validate()` 或函数式选项里，**没有唯一标准**；下文示例采用「少量必填走 `New()`、可选项链式追加」这一种拆法。
 
 ## 解决方案
 
-把「填字段」拆成链式（或分步）方法，把「校验并产出最终对象」收进 `Build()`。
-
-### 产品
-
-订单——字段多，且部分必填：
+下面演示 **一种常见拆法**：`New()` 接收少量必填项并设默认值，其余字段链式追加。全部字段都走链式 setter，或改用 GoF 式生成器 + `Build()`，同样成立。
 
 ```go
 type Order struct {
@@ -100,152 +54,60 @@ type Order struct {
     paymentMethod string
     priority      int
     deliverAt     time.Time
-    items         []string
     metadata      map[string]string
 }
 
-// 只暴露 getter，避免 Build 之后被随意改字段（可选但推荐）
-func (n *Order) Buyer() []string        { return n.buyer }
-func (n *Order) Items() string       { return n.items }
-func (n *Order) PaymentMethod() string    { return n.paymentMethod }
-// …
-```
-
-### 生成器
-
-生成器持有 **构建中的状态**；每个 setter 返回 `*OrderBuilder` 以支持链式调用：
-
-```go
-type OrderBuilder struct {
-    buyer         []string
-    invoiceTitle  []string
-    orderTitle    string
-    items         string
-    paymentMethod string
-    priority      int
-    deliverAt     time.Time
-    items         []string
-    metadata      map[string]string
-}
-
-func NewOrderBuilder() *OrderBuilder {
-    return &OrderBuilder{
-        paymentMethod:  "alipay", // 合理默认值
-        priority: 0,
-    }
-}
-
-func (b *OrderBuilder) Buyer(buyers ...string) *OrderBuilder {
-    b.buyer = append(b.buyer, buyers...)
-    return b
-}
-
-func (b *OrderBuilder) InvoiceTitle(buyers ...string) *OrderBuilder {
-    b.invoiceTitle = append(b.invoiceTitle, buyers...)
-    return b
-}
-
-func (b *OrderBuilder) OrderTitle(s string) *OrderBuilder {
-    b.orderTitle = s
-    return b
-}
-
-func (b *OrderBuilder) Items(s string) *OrderBuilder {
-    b.items = s
-    return b
-}
-
-func (b *OrderBuilder) PaymentMethod(c string) *OrderBuilder {
-    b.paymentMethod = c
-    return b
-}
-
-func (b *OrderBuilder) Priority(p int) *OrderBuilder {
-    b.priority = p
-    return b
-}
-
-func (b *OrderBuilder) DeliverAt(t time.Time) *OrderBuilder {
-    b.deliverAt = t
-    return b
-}
-
-func (b *OrderBuilder) Item(skus ...string) *OrderBuilder {
-    b.items = append(b.items, skus...)
-    return b
-}
-
-func (b *OrderBuilder) Metadata(key, value string) *OrderBuilder {
-    if b.metadata == nil {
-        b.metadata = make(map[string]string)
-    }
-    b.metadata[key] = value
-    return b
-}
-
-func (b *OrderBuilder) Build() (*Order, error) {
-    if len(b.buyer) == 0 {
+func NewOrder(buyer []string, items string) (*Order, error) {
+    if len(buyer) == 0 {
         return nil, fmt.Errorf("order: buyer required")
     }
-    if b.items == "" {
+    if items == "" {
         return nil, fmt.Errorf("order: items required")
     }
-    // 拷贝切片 / map，避免外部修改构建器内部状态
-    buyer := append([]string(nil), b.buyer...)
-    invoiceTitle := append([]string(nil), b.invoiceTitle...)
-    items := append([]string(nil), b.items...)
-    meta := make(map[string]string, len(b.metadata))
-    for k, v := range b.metadata {
-        meta[k] = v
-    }
     return &Order{
-        buyer: buyer, invoiceTitle: invoiceTitle, orderTitle: b.orderTitle, items: b.items,
-        paymentMethod: b.paymentMethod, priority: b.priority, deliverAt: b.deliverAt,
-        items: items, metadata: meta,
+        buyer:         buyer,
+        items:         items,
+        paymentMethod: "alipay",
+        priority:      0,
     }, nil
 }
+
+func (o *Order) OrderTitle(s string) *Order {
+    o.orderTitle = s
+    return o
+}
+
+// Priority、PaymentMethod、DeliverAt、InvoiceTitle 等同理，均 return o 以支持链式调用
 ```
 
 ### 使用者
 
-业务代码 **只调生成器 + `Build()`**，不再碰巨型构造函数：
+本示例中 `NewOrder` 已在构造时校验必填项，业务可直接提交：
 
 ```go
-func submitOrder(b *OrderBuilder) error {
-    n, err := b.Build()
-    if err != nil {
-        return err
-    }
-    // 交给已注入的 PaymentProcessor 提交…
-    return submit(n)
+func submitOrder(o *Order) error {
+    return submit(o)
 }
 
-// 调用方：只写关心的字段
-err := submitOrder(
-    NewOrderBuilder().
-        Buyer("user@example.com").
-        OrderTitle("订单已发货").
-        Items("您的包裹正在途中…").
-        Priority(1),
+// 本示例：必填走 New，可选链式追加
+order, err := NewOrder(
+    []string{"user@example.com"},
+    "您的包裹正在途中…",
+)
+if err != nil {
+    return err
+}
+err = submitOrder(
+    order.OrderTitle("订单已发货").Priority(1),
 )
 ```
-
-与巨型构造函数对比：
-
-| | 巨型构造函数 | 生成器 |
-| :--- | :--- | :--- |
-| 可读性 | 大量 `nil` 占位 | 具名方法，链式自解释 |
-| 必填校验 | 分散在各处 | 集中在 `Build()` |
-| 扩展字段 | 改签名，所有调用点受影响 | 加 setter，旧调用不动 |
-| 部分构建 | 容易造出半完成对象 | 未 `Build()` 前不暴露产品 |
-
 
 ## 适用场景
 
 1. **对象字段多、可选参数多**：HTTP 请求、支付宝/订单、报表配置、SQL 查询构建器等。
-2. **构建步骤有顺序或依赖**：先设 `PaymentMethod` 再校验 `Items` 长度、先 `Render` 订单模板再填 `OrderTitle`——步骤留在生成器方法里，比构造函数清晰。
-3. **需要不同表示、同一构建过程**：同一套 setter 流程，`Build()` 里根据 `paymentMethod` 产出不同校验规则或不同内部表示。
-4. **希望构建期与使用期分离**：未 `Build()` 的不算合法产品；`Build()` 内集中校验，符合 [单一职责](/cs-fundamentals/design-patterns#设计原则)。
+2. **构建步骤有顺序或依赖**：先设 `PaymentMethod` 再校验 `Items` 长度、先 `Render` 订单模板再填 `OrderTitle`——步骤留在 setter 方法里，比构造函数清晰。
+3. **需要封装常见组合**：`OrderShipped(buyer, orderID)` 这类预设函数内部链式填字段，比为每种组合写构造函数省事。
+4. **希望校验有固定落点**：在 `New()`、`Build()` 或提交前统一检查，避免每个调用方各自判空。
 
 常见例子：电商结算里的 `Order` 构建、ORM 的 query builder、测试数据构造器、带 many optional 的配置 struct。
 
@@ -256,25 +118,22 @@ err := submitOrder(
 | 优点 | 说明 |
 | :--- | :--- |
 | **可读性好** | 具名 setter 代替 positional 参数和满屏 `nil` |
-| **校验集中** | 必填、互斥字段在 `Build()` 一处处理 |
+| **校验可集中** | 必填、互斥规则可在 `New()`、`Build()` 等节点统一处理 |
 | **易扩展字段** | 新增 `InvoiceTitle()` 等方法，旧调用不受影响 |
-| **构建过程可复用** | 指导者或预设函数封装常见流程 |
-| **步骤清晰** | 构建中与构建后分离，减少半完成对象 |
+| **构建过程可复用** | 预设函数封装常见填字段流程 |
+| **步骤清晰** | 链式调用比 positional 参数好读 |
 
 | 缺点 | 说明 |
 | :--- | :--- |
-| **代码量变多** | 每个字段一个方法 + 一个 `Build()`，比单个 struct 重 |
+| **代码量变多** | 每个字段一个方法，比单个 struct 重 |
 | **间接层增加** | 读代码要跟踪链式调用 |
-| **可变构建器需注意** | 若复用同一 `Builder` 实例多次 `Build()`，要防止状态污染（见下文） |
 | **与函数式选项重叠** | Go 社区更常选 Functional Options；团队需统一风格 |
 
-## 组装实践
-
-> **阅读提示**：先掌握「`NewOrderBuilder()` + 链式 setter + `Build()`」即可。本节是 Go 项目里的常见变体；初学可先跳过。
+## 实践
 
 ### 函数式选项
 
-Go 里解决「多可选参数」的另一惯用法是 **Functional Options**：
+Go 里解决「多可选参数」的另一惯用法是 **Functional Options**（与上文链式写法 **二选一**，同包不必并存）：
 
 ```go
 type Option func(*Order)
@@ -287,8 +146,8 @@ func WithItems(items string) Option {
     return func(n *Order) { n.items = items }
 }
 
-func NewOrder(opts ...Option) (*Order, error) {
-    n := &Order{paymentMethod: "alipay"}
+func NewOrderFromOptions(opts ...Option) (*Order, error) {
+    n := &Order{paymentMethod: "alipay", priority: 0}
     for _, opt := range opts {
         opt(n)
     }
@@ -302,82 +161,48 @@ func NewOrder(opts ...Option) (*Order, error) {
 }
 
 // 调用
-n, err := NewOrder(
+n, err := NewOrderFromOptions(
     WithBuyer("user@example.com"),
     WithItems("hello"),
 )
 ```
 
-与生成器对比：
+与链式写法对比：
 
-| | 生成器（链式） | 函数式选项 |
+| | 链式 setter | 函数式选项 |
 | :--- | :--- | :--- |
-| 写法 | `b.Buyer(...).Items(...).Build()` | `NewXxx(WithBuyer(...), WithItems(...))` |
-| 状态 | 显式 `Builder` struct | 闭包改 `Order` |
-| 步骤感 | 强，适合逐项填写订单字段 | 弱，更像一次性传入配置项 |
-| Go 社区 | 常见，尤其库对外 API | **更常见**（`grpc.DialOption` 等） |
-| 复用构建流程 | 指导者 / 同一 builder 实例 | 组合 `Option` 变量或 `Options()` 辅助函数 |
+| 写法 | `NewOrder(buyer, items).OrderTitle(...)` | `NewOrderFromOptions(WithBuyer(...), ...)` |
+| 步骤感 | 强，适合逐项填写 | 弱，更像一次性传入配置项 |
+| Go 社区 | 常见 | **更常见**（`grpc.DialOption` 等） |
+| 复用构建流程 | 预设函数内部链式调用 | 组合 `Option` 变量 |
 
 两者都优于巨型构造函数。团队选一种并保持一致即可；**不必** 为同一类型同时维护两套 API。
 
-### 复用生成器实例
+### 预设组合
 
-同一 `OrderBuilder` 若连续 `Build()` 两次，第二次会 **带着第一次的字段**（除非手动重置）。常见做法：
-
-1. **每次 `NewOrderBuilder()` 新建**（最简单，推荐默认）。
-2. **`Build()` 后返回新 builder**，或提供 `Reset()`。
-3. **指导者每次注入新 builder**，不在 Director 内长期持有可变状态。
+常见订单模板可以封装成函数，内部链式填字段：
 
 ```go
-func (d *OrderDirector) BuildOrderShipped(buyer, orderID string) (*Order, error) {
-    return NewOrderBuilder(). // 每次新建，避免污染
-        Buyer(buyer).
-        OrderTitle("订单已发货").
-        Items(fmt.Sprintf("订单 %s 已发出。", orderID)).
-        Build()
-}
-```
-
-### 与工厂方法组合
-
-[工厂方法](/cs-fundamentals/design-patterns/factory) 在 **组装层** 选定 `PaymentProcessor`；生成器在 **运行时** 拼出每条订单——职责不同，常一起出现：
-
-```go
-type Service struct {
-    processor PaymentProcessor // 组装时注入：造哪种支付渠道
-}
-
-func (s *Service) Checkout(builder *OrderBuilder) error {
-    n, err := builder.Build()
+func OrderShipped(buyer, orderID string) (*Order, error) {
+    o, err := NewOrder(
+        []string{buyer},
+        fmt.Sprintf("订单 %s 已发出。", orderID),
+    )
     if err != nil {
-        return err
+        return nil, err
     }
-    return s.processor.Pay(n) // PaymentProcessor 只关心已构建好的 Order
+    return o.OrderTitle("订单已发货"), nil
 }
 ```
 
-选型（支付宝 / 微信支付 / 信用卡）留在 `main`；单条订单长什么样，由调用方或 Director 通过生成器决定。
 
-### 不可变产品与 `Build()`
+## 关联
 
-若希望 **产品一经构建就不可变**（便于并发、缓存）：
-
-- 字段小写 + 只读 getter（上文 `Order`）。
-- `Build()` 内做 **深拷贝**（切片、map）。
-- 生成器本身可变无妨——变的是「草稿」，不是「定稿」。
-
-这与 [开闭原则](/cs-fundamentals/design-patterns#设计原则) 不直接冲突，但有助于避免「发出去之后又被改内容」类 bug。
-
-## 小结
-
-记住这四点即可：
-
-1. **字段多、可选多 → 考虑生成器**：用 setter 链代替巨型构造函数和满屏 `nil`。
-2. **`Build()` 集中校验**：必填、互斥、默认值在构建终点处理，而不是散落在调用方。
-3. **和工厂方法分工不同**：工厂管「造哪类对象」；生成器管「一个复杂对象怎么一步步拼好」。
-4. **Go 里也可选函数式选项**：与链式生成器二选一，勿两套并行维护。
-
-上一篇的 [抽象工厂模式](/cs-fundamentals/design-patterns/abstract-factory) 管 **一族产品成套创建**；本篇管 **单个复杂产品分步构建**。对象种类多但构造简单 → 工厂；一种对象字段爆炸 → 生成器。若某些订单模板已经用生成器构建好，后续下单只是复制模板并替换少量字段，就进入下一篇 [原型模式](/cs-fundamentals/design-patterns/prototype)。
+- 许多设计在初期会先用 [工厂方法模式](/cs-fundamentals/design-patterns/factory)（较简单，也便于通过子类定制），随后再演化为 [抽象工厂模式](/cs-fundamentals/design-patterns/abstract-factory)、[原型模式](/cs-fundamentals/design-patterns/prototype) 或 [生成器模式](/cs-fundamentals/design-patterns/builder)（更灵活，也更复杂）。
+- [生成器模式](/cs-fundamentals/design-patterns/builder) 关注如何 **分步** 拼出一个复杂对象；[抽象工厂模式](/cs-fundamentals/design-patterns/abstract-factory) 则专门生产 **一系列相关对象**。抽象工厂拿到手就是成品，生成器则允许你在取回产品前再执行若干构造步骤（`Build()`、链式 setter 填完再提交等）。
+- 构造复杂的 [组合模式](/cs-fundamentals/design-patterns/composite) 树时，生成器的构建步骤可以 **递归** 执行——父节点和子节点用同一套分步 API 逐层填好。
+- 生成器可与 [桥接模式](/cs-fundamentals/design-patterns/bridge) 搭配：**指导者**（Director，封装固定构建流程的类或函数）负责抽象侧的组装步骤，不同 **生成器** 负责具体实现侧的填字段细节。
+- [抽象工厂模式](/cs-fundamentals/design-patterns/abstract-factory)、生成器与 [原型模式](/cs-fundamentals/design-patterns/prototype) 的实现类，都可以用 [单例模式](/cs-fundamentals/design-patterns/singleton) 来提供全局唯一的工厂或生成器实例。
 
 ## 参考阅读
 
