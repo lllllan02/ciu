@@ -1,0 +1,558 @@
+---
+title: 中介者模式
+order: 16
+---
+
+**中介者模式**（Mediator）用 **一个中介对象** 封装 **一组对等对象（同事类）之间的交互**：同事 **只与中介通信**，彼此 **不直接引用**——从而把 **多对多网状依赖** 收成 **星型（每人只连中介）**，并让 **「谁变了要通知谁、按什么顺序联动」** 集中在中介里维护，同事可 **独立替换与测试**。
+
+与 [外观模式](/cs-fundamentals/design-patterns/facade) 的 **分工** 很常被问到：[外观](/cs-fundamentals/design-patterns/facade) 面向 **外部客户端**，把 **子系统协作** 收成 **`PlaceOrder` 一次调用**——子系统 **通常不知彼此**，由 Facade **单向编排**；中介者面向 **内部多个对等组件**，解决 **它们互相联动**（改地址 → 重算运费 → 刷新应付 → 过滤支付方式）时的 **N×N 引用**。与 **观察者** 也不同：观察者 **主题广播** 给订阅者，订阅者 **仍可能互相调用**；中介者 **规定交互协议**，同事 **只 `Notify(mediator, event)`**，由中介 **决定** 调哪些同事的哪个方法。与 [责任链](/cs-fundamentals/design-patterns/chain-of-responsibility) 也不同：责任链 **沿链传递同一请求**；中介 **根据事件类型路由到多个同事**，是 **协调 hub** 而非 **单线传递**。
+
+下文继续用「电商订单系统」：[外观](/cs-fundamentals/design-patterns/facade) 已提供 **`PlaceOrder` 提交**；[装饰器](/cs-fundamentals/design-patterns/decorator) 已支持行级计价增强。当 **结算页 / 代客下单工作台** 上有 **明细、地址、优惠券、配送、支付、合计** 等多个 **对等面板**，且 **任一改动触发多方刷新** 时，若每个面板 **直接持有** 其他面板引用，会出现 **改一个组件要改全页、组合测试爆炸**——中介者把 **联动规则** 收到 `CheckoutMediator`，面板只 **上报事件**。
+
+## 问题
+
+结算页各区块开始 **互相直接调用**：
+
+```go
+type LineItemsPanel struct {
+    summary *SummaryPanel
+    shipping *ShippingPanel
+    coupon   *CouponWidget
+}
+
+func (p *LineItemsPanel) OnQtyChanged(sku string, qty int) {
+    p.summary.RecalcTotal()
+    p.shipping.RecalcFee() // 重量变了
+    p.coupon.Revalidate()  // 满减门槛可能变
+}
+
+type AddressForm struct {
+    shipping *ShippingPanel
+    summary  *SummaryPanel
+    payment  *PaymentPanel
+}
+
+func (f *AddressForm) OnAddressChanged(addr Address) {
+    f.shipping.SetDestination(addr)
+    f.summary.RecalcTotal()
+    f.payment.FilterByRegion(addr.Country) // 跨境禁某些渠道
+}
+
+type CouponWidget struct {
+    summary  *SummaryPanel
+    shipping *ShippingPanel
+    payment  *PaymentPanel
+}
+
+func (c *CouponWidget) OnCouponApplied(code string) {
+    c.summary.ApplyDiscount(code)
+    if c.summary.FreeShipping() {
+        c.shipping.ZeroFee()
+    }
+    c.payment.RefreshInstallmentOptions()
+}
+```
+
+1. **网状耦合**：6 个面板 **两两引用**，潜在 **N(N−1)** 条边；加「发票抬头」区块要 **改 5 个 struct 的字段**。
+2. **联动逻辑散落**：「用券后免运」写在 `CouponWidget`，「改地址禁支付」写在 `AddressForm`——**同一业务规则** 重复或 **互相遗漏**。
+3. **难以复用与测试**：单测 `AddressForm` 必须 **mock Summary、Shipping、Payment**；B 端工作台想 **少一块支付面板**，要 **改所有 New 函数**。
+4. **违反迪米特法则**：面板本应只管 **自己的 UI 状态**，却 **跨层知道** 运费怎么算、分期怎么刷。
+5. **与外观 / 装饰的分工错位**：[外观](/cs-fundamentals/design-patterns/facade) 管 **最终提交用例**；[装饰器](/cs-fundamentals/design-patterns/decorator) 管 **行级计价**——这里要解决的是 **结算页内多个对等 UI/领域块如何联动**，不是 **HTTP 一次 PlaceOrder**。
+
+本质矛盾是：**多个对等对象** 需要 **随用户操作彼此同步**，但 **谁该响应谁** 的规则会 **频繁变化**；不应让每个对象 **维护一张依赖图**。
+
+### 中介者 vs 外观 vs 事件总线
+
+| 方式 | 谁在用 | 交互形态 | 何时够用 |
+| :--- | :--- | :--- | :--- |
+| **直接互引** | 同事互调 | 网状 | 2 个控件、规则永不改 |
+| **外观 Facade** | **外部** 客户端 | 客户端 → 子系统 **单向** | 一次提交、无页内联动 |
+| **中介者 Mediator** | **内部** 同事 | 同事 → 中介 → 同事 | 多面板联动、规则集中 |
+| **全局 EventBus** | 任意发布订阅 | 广播、弱类型 | 跨模块解耦；**结算页内** 仍要 **显式编排** 防乱序 |
+
+EventBus 可与 Mediator **结合**：中介 **订阅/发布** 领域事件，但 **页内联动顺序**（先计价再刷支付）仍由 **CheckoutMediator** 保证。
+
+## 意图
+
+用一句话说：**用一个中介对象来封装一系列的对象交互。中介者使各对象不需要显式地相互引用，从而使其耦合松散，而且可以独立地改变它们之间的交互。**
+
+引入 **中介者**（Mediator）统一协调；**同事**（Colleague）只持有 `Mediator` 引用，状态变化时 **`Notify(event)`**；中介 **更新共享 CheckoutContext** 并 **回调** 需要刷新的同事：
+
+```go
+// 地址变更：面板只通知中介
+func (f *AddressForm) OnAddressChanged(addr Address) {
+    f.mediator.Notify(ColleagueAddress, Event{Type: AddressChanged, Payload: addr})
+}
+// 中介内：SetDestination → RecalcFee → RecalcTotal → FilterPayment
+```
+
+GoF 从 **结构** 角度的定义：
+
+> 用一个中介对象来封装一系列的对象交互。中介者使各对象不需要显式地相互引用，从而使其耦合松散，而且可以独立地改变它们之间的交互。
+
+### 和外观、观察者、责任链有啥不同
+
+| | 中介者 | 外观 | 观察者 | 责任链 |
+| :--- | :--- | :--- | :--- | :--- |
+| **动机** | **封装同事间交互** | **简化外部对子系统的使用** | **状态变化通知** | **请求沿链传递** |
+| **中心角色** | Mediator **双向协调** | Facade **对外门面** | Subject **广播** | Handler **链式** |
+| **同事是否互知** | **否** | 子系统 **可不知 Facade** | 订阅者 **可互调** | 处理者 **只认 next** |
+| **典型场景** | 对话框 / 结算页联动 | `PlaceOrder` | 订单状态变更推送 | 下单前校验链 |
+| **电商例子** | 改券刷新运付合计 | 提交订单编排 | 订单已支付 → 发短信 | 风控链 |
+
+#### 中介者像「页面内的 Facade」吗？
+
+**不像。** Facade **对外** 隐藏子系统；Mediator **对内** 让 **同级** 组件不互引。结算页 **提交** 仍调 [外观](/cs-fundamentals/design-patterns/facade) `PlaceOrder`；**页内编辑过程** 用 Mediator——**提交前联动** vs **提交动作** 分层。
+
+#### 中介者和 MVC Controller 一样吗？
+
+**部分像。** 富 Controller 也会 **收事件、调多个 ViewModel**——Mediator 把这段 **从 God Controller 抽成独立类型**，同事 **可复用于 App / Web**，且 **联动规则可单测**。
+
+## 解决方案
+
+定义 **中介者** 接口；**具体中介** 持有 **共享上下文** 与同事引用；各 **同事** 只依赖 `Mediator`。
+
+### 共享上下文（CheckoutContext）
+
+```go
+type CheckoutContext struct {
+    Lines    []OrderLine
+    Address  Address
+    Coupon   string
+    Shipping ShippingQuote
+    Total    int64
+    Region   string
+}
+
+type EventType string
+
+const (
+    LinesChanged    EventType = "lines_changed"
+    AddressChanged  EventType = "address_changed"
+    CouponApplied   EventType = "coupon_applied"
+    ShippingChanged EventType = "shipping_changed"
+)
+
+type Event struct {
+    Type    EventType
+    Payload any
+}
+```
+
+上下文 **由中介维护**；同事 **读快照** 或通过中介 **查询**，避免 **直接改** 他人状态。
+
+### 中介者（Mediator）接口与同事标识
+
+```go
+type ColleagueID string
+
+const (
+    ColleagueLines    ColleagueID = "lines"
+    ColleagueAddress  ColleagueID = "address"
+    ColleagueCoupon   ColleagueID = "coupon"
+    ColleagueShipping ColleagueID = "shipping"
+    ColleaguePayment  ColleagueID = "payment"
+    ColleagueSummary  ColleagueID = "summary"
+)
+
+type Colleague interface {
+    ID() ColleagueID
+    Refresh(ctx context.Context, state *CheckoutContext) error
+}
+
+type Mediator interface {
+    Register(c Colleague)
+    Notify(from ColleagueID, ev Event) error
+    State() *CheckoutContext
+}
+```
+
+`Notify` **由触发变更的同事调用**；`Refresh` **由中介回调** 需要更新的同事。
+
+### 具体中介：CheckoutMediator
+
+```go
+type CheckoutMediator struct {
+    state      CheckoutContext
+    colleagues map[ColleagueID]Colleague
+    pricing    PricingEngine
+    shipping   ShippingService
+}
+
+func (m *CheckoutMediator) Register(c Colleague) {
+    if m.colleagues == nil {
+        m.colleagues = make(map[ColleagueID]Colleague)
+    }
+    m.colleagues[c.ID()] = c
+}
+
+func (m *CheckoutMediator) State() *CheckoutContext {
+    return &m.state
+}
+
+func (m *CheckoutMediator) Notify(from ColleagueID, ev Event) error {
+    ctx := context.Background()
+    switch ev.Type {
+    case LinesChanged:
+        lines := ev.Payload.([]OrderLine)
+        m.state.Lines = lines
+        return m.recalcAll(ctx)
+
+    case AddressChanged:
+        addr := ev.Payload.(Address)
+        m.state.Address = addr
+        m.state.Region = addr.Country
+        quote, err := m.shipping.Quote(ctx, addr, m.state.Lines)
+        if err != nil {
+            return err
+        }
+        m.state.Shipping = quote
+        if err := m.refresh(ColleagueShipping, ColleaguePayment, ColleagueSummary); err != nil {
+            return err
+        }
+        return m.recalcTotal(ctx)
+
+    case CouponApplied:
+        m.state.Coupon = ev.Payload.(string)
+        if err := m.recalcTotal(ctx); err != nil {
+            return err
+        }
+        if m.pricing.FreeShipping(m.state.Coupon, m.state.Total) {
+            m.state.Shipping.Fee = 0
+            _ = m.colleagues[ColleagueShipping].Refresh(ctx, &m.state)
+        }
+        return m.refresh(ColleagueSummary, ColleaguePayment)
+
+    default:
+        return nil
+    }
+}
+
+func (m *CheckoutMediator) recalcAll(ctx context.Context) error {
+    quote, err := m.shipping.Quote(ctx, m.state.Address, m.state.Lines)
+    if err != nil {
+        return err
+    }
+    m.state.Shipping = quote
+    if err := m.recalcTotal(ctx); err != nil {
+        return err
+    }
+    return m.refresh(ColleagueShipping, ColleagueSummary, ColleaguePayment, ColleagueCoupon)
+}
+
+func (m *CheckoutMediator) recalcTotal(ctx context.Context) error {
+    m.state.Total = m.pricing.Total(ctx, m.state.Lines, m.state.Coupon, m.state.Shipping)
+    return nil
+}
+
+func (m *CheckoutMediator) refresh(ctx context.Context, ids ...ColleagueID) error {
+    for _, id := range ids {
+        if c, ok := m.colleagues[id]; ok {
+            if err := c.Refresh(ctx, &m.state); err != nil {
+                return err
+            }
+        }
+    }
+    return nil
+}
+```
+
+**联动顺序**（先运费再合计再支付）**只写在一处**；新增「发票抬头」= **新 Colleague + 在对应 `case` 里 `refresh`**。
+
+### 具体同事：地址表单（只认中介）
+
+```go
+type AddressForm struct {
+    mediator Mediator
+    addr     Address
+}
+
+func (f *AddressForm) SetMediator(m Mediator) { f.mediator = m }
+
+func (f *AddressForm) ID() ColleagueID { return ColleagueAddress }
+
+func (f *AddressForm) OnUserSelect(addr Address) error {
+    f.addr = addr
+    return f.mediator.Notify(ColleagueAddress, Event{Type: AddressChanged, Payload: addr})
+}
+
+func (f *AddressForm) Refresh(ctx context.Context, state *CheckoutContext) error {
+    // 只更新自身展示，例如从 state 同步校验提示
+    return nil
+}
+```
+
+### 具体同事：合计面板
+
+```go
+type SummaryPanel struct {
+    mediator Mediator
+    display  int64
+}
+
+func (p *SummaryPanel) ID() ColleagueID { return ColleagueSummary }
+
+func (p *SummaryPanel) Refresh(ctx context.Context, state *CheckoutContext) error {
+    p.display = state.Total + state.Shipping.Fee
+    return nil
+}
+```
+
+### 具体同事：支付面板（示例）
+
+```go
+type PaymentPanel struct {
+    mediator       Mediator
+    regionFiltered bool
+}
+
+func (p *PaymentPanel) SetMediator(m Mediator) { p.mediator = m }
+
+func (p *PaymentPanel) ID() ColleagueID { return ColleaguePayment }
+
+func (p *PaymentPanel) Refresh(ctx context.Context, state *CheckoutContext) error {
+    p.regionFiltered = state.Region != "" // 按地区过滤 COD 等
+    return nil
+}
+```
+
+### 组装与客户端
+
+```go
+func NewCheckoutPage(pricing PricingEngine, ship ShippingService) *CheckoutMediator {
+    m := &CheckoutMediator{pricing: pricing, shipping: ship}
+    lines := &LineItemsPanel{}
+    addr := &AddressForm{}
+    coupon := &CouponWidget{}
+    shipping := &ShippingPanel{}
+    payment := &PaymentPanel{}
+    summary := &SummaryPanel{}
+
+    for _, c := range []Colleague{lines, addr, coupon, shipping, payment, summary} {
+        m.Register(c)
+        if setter, ok := c.(interface{ SetMediator(Mediator) }); ok {
+            setter.SetMediator(m)
+        }
+    }
+    return m
+}
+
+// 用户点「提交」——仍走外观，不走 Mediator 替代 PlaceOrder
+func (h *CheckoutHandler) Submit(w http.ResponseWriter, r *http.Request) {
+    state := h.page.State()
+    req := PlaceOrderRequest{Lines: state.Lines, Address: state.Address, /* … */}
+    if err := h.facade.PlaceOrder(r.Context(), req); err != nil {
+        http.Error(w, err.Error(), 500)
+    }
+}
+```
+
+**页内协同** 用 Mediator；**落库提交** 用 [外观](/cs-fundamentals/design-patterns/facade)——职责清晰。
+
+## 结构
+
+| 角色 | 代码里是谁 | 管什么 |
+| :--- | :--- | :--- |
+| **中介者**（Mediator） | `Mediator` / `CheckoutMediator` | 封装同事间交互、维护上下文 |
+| **具体中介者**（ConcreteMediator） | `CheckoutMediator` | 事件路由与联动顺序 |
+| **同事**（Colleague） | `Colleague` 接口 | 向 Mediator 通知、被 Refresh |
+| **具体同事**（ConcreteColleague） | `AddressForm`、`SummaryPanel` 等 | 各自 UI/子域，不互引 |
+| **客户端**（Client） | `CheckoutHandler`、页面组装 | 创建中介与同事；提交调 Facade |
+
+```mermaid
+flowchart TD
+    M["CheckoutMediator"]
+    L["LineItemsPanel"]
+    A["AddressForm"]
+    C["CouponWidget"]
+    S["ShippingPanel"]
+    P["PaymentPanel"]
+    U["SummaryPanel"]
+    L --> M
+    A --> M
+    C --> M
+    M --> S
+    M --> P
+    M --> U
+```
+
+对比 **无中介** 的网状结构：
+
+```mermaid
+flowchart LR
+    L2["Lines"] --> U2["Summary"]
+    L2 --> S2["Shipping"]
+    A2["Address"] --> S2
+    A2 --> P2["Payment"]
+    C2["Coupon"] --> U2
+    C2 --> P2
+```
+
+### 和 GoF 术语的对应（选读）
+
+| GoF 叫法 | 本文代码 | 一句话 |
+| :--- | :--- | :--- |
+| Mediator | `CheckoutMediator` | 协调同事交互 |
+| ConcreteMediator | 同上 | 具体联动规则 |
+| Colleague | `Colleague` | 对等组件 |
+| ConcreteColleague | `AddressForm` 等 | 只依赖 Mediator |
+| Client | 页面组装 / Handler | 注册同事、提交订单 |
+
+Go 无 Colleague 基类：**接口 + 组合**；`SetMediator` 在 **Register 时注入**。
+
+## 适用场景
+
+1. **多个对等对象交互复杂**：结算页、配置向导、IDE 工具窗口、聊天室（用户只经 ChatRoom 发消息）。
+2. **网状依赖难维护**：加/减一个面板不想 **改 N 个 struct**。
+3. **联动规则常变**：「跨境禁 COD」「满额免运」集中在 Mediator **改 case**。
+4. **需独立测试同事**：mock `Mediator`，断言 **Notify 了什么事件**。
+5. **复用同事到不同页面**：B 端少注册 `PaymentPanel`，中介 **refresh 列表不含 payment**。
+
+**不必强行使用**：
+
+- **两个控件、一条固定联动**——直接回调更简单。
+- **外部一次调用多个子系统**——用 [外观](/cs-fundamentals/design-patterns/facade)，不是 Mediator。
+- **单向广播、无协调顺序**——观察者 / EventBus 足够。
+- **请求沿链择一处理**——用 [责任链](/cs-fundamentals/design-patterns/chain-of-responsibility)。
+
+常见例子：对话框控件联动、航空管制、群聊、前端 Redux store + dispatch（集中状态与 reducer 类似 Mediator 思想）、WPF `Interaction.RequestNavigate`。
+
+## 优缺点
+
+| 优点 | 说明 |
+| :--- | :--- |
+| **降低同事间耦合** | N 条边 → **每人一条到 Mediator** |
+| **集中交互逻辑** | 免运、禁支付等 **一处维护** |
+| **开闭** | 新同事 **Register + 改 Notify 分支** |
+| **符合迪米特法则** | 同事 **只认识 Mediator** |
+| **易测** | 中介单测 **事件 → refresh 顺序** |
+
+| 缺点 | 说明 |
+| :--- | :--- |
+| **中介可能膨胀** | `CheckoutMediator` 变 God Object——需 **按事件拆私有方法** 或 **分层中介** |
+| **间接层** | 调试要 trace **Notify 路径** |
+| **与 Observer 职责重叠** | 团队需约定：**页内 Mediator，跨模块 Bus** |
+| **过度设计** | 两控件页面 **不必** 上 Mediator |
+| **并发** | 共享 `CheckoutContext` 要 **锁或单线程 UI 模型** |
+
+## 组装实践
+
+> **阅读提示**：先掌握「**同事 Notify，中介 Refresh**」即可。本节是工程变体；初学可先跳过。
+
+### 中介者 vs 全局 EventBus
+
+```go
+// 跨服务：订单已支付 → 通知、积分、搜索
+bus.Publish(OrderPaid{ID: orderID})
+
+// 结算页内：必须先 recalcTotal 再 refresh Payment
+mediator.Notify(ColleagueCoupon, Event{Type: CouponApplied, Payload: code})
+```
+
+**页内** 用 Mediator 保证 **顺序与一致性**；**跨 bounded context** 用 Bus。**勿** 用全局 Bus 替代页内 Mediator 却 **无编排**，易出现 **Payment 读到旧 Total**。
+
+### 分层中介
+
+| 层级 | 职责 | 例子 |
+| :--- | :--- | :--- |
+| **页面中介** | UI 块联动 | `CheckoutMediator` |
+| **用例外观** | 提交编排 | `CheckoutFacade.PlaceOrder` |
+| **领域服务** | 纯规则 | `PricingEngine.Total` |
+
+```text
+User edits address
+  → CheckoutMediator.Notify（页内）
+User clicks Submit
+  → CheckoutFacade.PlaceOrder（用例）
+  → Inventory / Payment / Orders（子系统）
+```
+
+[装饰器](/cs-fundamentals/design-patterns/decorator) 在 **`PricingEngine.Total` 内部** 叠行级价；Mediator **不替代** 计价领域逻辑。
+
+### 与命令、责任链一起用
+
+- **页内**：Mediator 协调展示；用户点「改数量」可 **`invoker.Run(AdjustQuantityCommand)`**（[命令](/cs-fundamentals/design-patterns/command)）成功后 **`mediator.Notify(LinesChanged)`**。
+- **提交前**：`PlaceOrder` 前 **`preCheckChain.Handle`**（[责任链](/cs-fundamentals/design-patterns/chain-of-responsibility)）在 Facade 内；Mediator **不参与** 服务端校验链。
+
+### 防止中介膨胀
+
+```go
+// 按领域拆私有策略，Mediator 只做 dispatch
+type CheckoutRules struct {
+    pricing  PricingEngine
+    shipping ShippingService
+}
+
+func (r *CheckoutRules) OnAddressChanged(state *CheckoutContext, addr Address) error {
+    state.Address = addr
+    state.Region = addr.Country
+    q, err := r.shipping.Quote(context.Background(), addr, state.Lines)
+    if err != nil {
+        return err
+    }
+    state.Shipping = q
+    return r.recalcTotal(state)
+}
+```
+
+`CheckoutMediator.Notify` **委托** `rules.OnXxx`；复杂规则 **可单测 Rules** 而不 mock 六个 Panel。
+
+### 测试策略
+
+```go
+func TestCheckoutMediator_AddressChangeRefreshesPayment(t *testing.T) {
+    payment := &PaymentPanel{}
+    m := NewCheckoutPage(fakePricing{}, fakeShipping{})
+    m.Register(payment) // 覆盖默认注册，便于断言
+    addr := &AddressForm{mediator: m}
+    m.Register(addr)
+
+    if err := addr.OnUserSelect(Address{Country: "US"}); err != nil {
+        t.Fatal(err)
+    }
+    if !payment.regionFiltered {
+        t.Fatal("payment should refresh on address change")
+    }
+}
+
+func TestAddressForm_DoesNotReferenceSummary(t *testing.T) {
+    med := &recordingMediator{lastFrom: ColleagueAddress}
+    f := &AddressForm{mediator: med}
+    _ = f.OnUserSelect(Address{City: "Shanghai"})
+    if med.lastEvent.Type != AddressChanged {
+        t.Fatal("should notify mediator only")
+    }
+}
+
+type recordingMediator struct {
+    lastFrom  ColleagueID
+    lastEvent Event
+}
+
+func (r *recordingMediator) Register(Colleague) {}
+func (r *recordingMediator) State() *CheckoutContext { return &CheckoutContext{} }
+func (r *recordingMediator) Notify(from ColleagueID, ev Event) error {
+    r.lastFrom, r.lastEvent = from, ev
+    return nil
+}
+```
+
+## 小结
+
+记住这四点即可：
+
+1. **星型而非网状**：同事 **只 Notify Mediator**，不互持引用。
+2. **联动规则集中**：改地址 → 运费 → 合计 → 支付过滤 **写在中介**（或 `CheckoutRules`）。
+3. **与 Facade 分层**：Mediator 管 **页内/会话内协同**；Facade 管 **提交用例 PlaceOrder**。
+4. **开闭靠 Register**：新面板 **实现 Colleague + Register**；改 **Notify 分支** 而非改所有同事。
+
+[外观模式](/cs-fundamentals/design-patterns/facade) 解决了 **「外部客户端如何一次用完子系统」**；中介者解决 **「内部多个对等组件如何联动而不织成网」**——把 **对象间的交互** 从分散的 **双向依赖** 收到 **可测试、可演进的中介**，符合 [迪米特法则](/cs-fundamentals/design-patterns#设计原则) 与 **单一职责**。
+
+## 参考阅读
+
+- [x] [外观模式](/cs-fundamentals/design-patterns/facade) — 提交编排；与页内 Mediator 分层
+- [x] [责任链模式](/cs-fundamentals/design-patterns/chain-of-responsibility) — 服务端校验链；非页内联动
+- [x] [命令模式](/cs-fundamentals/design-patterns/command) — 可撤销改单；可与 Notify 配合
+- [x] [装饰器模式](/cs-fundamentals/design-patterns/decorator) — 行级计价；在 PricingEngine 内
+- [x] [Refactoring.Guru - 中介者模式](https://refactoringguru.cn/design-patterns/mediator) (2026-06-22)
+- [x] [菜鸟教程 - 中介者模式](https://www.runoob.com/design-pattern/mediator-pattern.html) (2026-06-22)

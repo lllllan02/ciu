@@ -393,7 +393,7 @@ Go 1.18+ 也可用泛型辅助函数收集所有 `ProductLine`，避免业务里
 两种缓解：
 
 1. **拆小接口**：`Pricer`、`Validator`、`InventoryHolder`——Client 按需组合约束。
-2. **访问者模式**（后续模式）：新操作 = 新 Visitor，Component 只保留 `Accept(Visitor)`。
+2. **[访问者模式](/cs-fundamentals/design-patterns/visitor)**：新操作 = 新 Visitor，Component 只保留 `Accept(Visitor)`。
 
 小项目 **3～5 个方法** 留在 `OrderLine` 即可；方法超过 ~7 个且还在涨，再考虑访问者。
 
