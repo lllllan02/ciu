@@ -349,56 +349,6 @@ func (h *CheckoutHandler) Submit(w http.ResponseWriter, r *http.Request) {
 
 **页内协同** 用 Mediator；**落库提交** 用 [外观](/cs-fundamentals/design-patterns/facade)——职责清晰。
 
-## 结构
-
-| 角色 | 代码里是谁 | 管什么 |
-| :--- | :--- | :--- |
-| **中介者**（Mediator） | `Mediator` / `CheckoutMediator` | 封装同事间交互、维护上下文 |
-| **具体中介者**（ConcreteMediator） | `CheckoutMediator` | 事件路由与联动顺序 |
-| **同事**（Colleague） | `Colleague` 接口 | 向 Mediator 通知、被 Refresh |
-| **具体同事**（ConcreteColleague） | `AddressForm`、`SummaryPanel` 等 | 各自 UI/子域，不互引 |
-| **客户端**（Client） | `CheckoutHandler`、页面组装 | 创建中介与同事；提交调 Facade |
-
-```mermaid
-flowchart TD
-    M["CheckoutMediator"]
-    L["LineItemsPanel"]
-    A["AddressForm"]
-    C["CouponWidget"]
-    S["ShippingPanel"]
-    P["PaymentPanel"]
-    U["SummaryPanel"]
-    L --> M
-    A --> M
-    C --> M
-    M --> S
-    M --> P
-    M --> U
-```
-
-对比 **无中介** 的网状结构：
-
-```mermaid
-flowchart LR
-    L2["Lines"] --> U2["Summary"]
-    L2 --> S2["Shipping"]
-    A2["Address"] --> S2
-    A2 --> P2["Payment"]
-    C2["Coupon"] --> U2
-    C2 --> P2
-```
-
-### 和 GoF 术语的对应（选读）
-
-| GoF 叫法 | 本文代码 | 一句话 |
-| :--- | :--- | :--- |
-| Mediator | `CheckoutMediator` | 协调同事交互 |
-| ConcreteMediator | 同上 | 具体联动规则 |
-| Colleague | `Colleague` | 对等组件 |
-| ConcreteColleague | `AddressForm` 等 | 只依赖 Mediator |
-| Client | 页面组装 / Handler | 注册同事、提交订单 |
-
-Go 无 Colleague 基类：**接口 + 组合**；`SetMediator` 在 **Register 时注入**。
 
 ## 适用场景
 

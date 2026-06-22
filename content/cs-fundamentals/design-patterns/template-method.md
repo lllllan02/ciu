@@ -333,39 +333,6 @@ func (f *CheckoutFacade) PlaceOrder(ctx context.Context, req PlaceOrderRequest) 
 
 [外观](/cs-fundamentals/design-patterns/facade) **对外一个入口**；内部 **按渠道选 Template**——**Hollywood**：Controller **只调 Facade**，Facade **调模板**，模板 **调 Hooks**。
 
-## 结构
-
-| 角色 | 代码里是谁 | 管什么 |
-| :--- | :--- | :--- |
-| **抽象类**（AbstractClass） | `CheckoutTemplate` | 模板方法 `PlaceOrder`、默认钩子 |
-| **具体类**（ConcreteClass） | `B2BHooks`、`AppHooks` | 覆写钩子 |
-| **模板方法**（Template Method） | `PlaceOrder` | 固定骨架 |
-| **原语操作**（Primitive） | `Reserve`、`Save` | 骨架内固定步骤 |
-| **钩子**（Hook） | `PrePlace`、`AfterPlace` | 可覆写、可空 |
-| **客户端**（Client） | `CheckoutFacade` | 选 Concrete、调用模板 |
-
-```mermaid
-flowchart TD
-    F["CheckoutFacade"] --> T["CheckoutTemplate\nPlaceOrder()"]
-    T --> H1["Hooks.PrePlace"]
-    T --> R["Reserve"]
-    T --> P["Pricing.Total"]
-    T --> H2["Hooks.CollectPayment"]
-    T --> S["Orders.Save"]
-    T --> H3["Hooks.AfterPlace"]
-```
-
-### 和 GoF 术语的对应（选读）
-
-| GoF 叫法 | 本文代码 | 一句话 |
-| :--- | :--- | :--- |
-| AbstractClass | `CheckoutTemplate` | 定义骨架 |
-| TemplateMethod | `PlaceOrder` | 固定顺序 |
-| PrimitiveOperation | `Reserve`、`Save` | 骨架内步骤 |
-| HookOperation | `PrePlace`、`AfterPlace` | 可选/可变步骤 |
-| ConcreteClass | `B2BHooks` | 覆写钩子 |
-
-Go 用 **Hooks 接口 + 组合** 代替 **继承覆写**——仍是模板方法。
 
 ## 适用场景
 

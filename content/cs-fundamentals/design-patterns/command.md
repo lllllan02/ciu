@@ -286,46 +286,6 @@ func (h *AdminHandler) Undo(w http.ResponseWriter, r *http.Request) {
 
 Client **只构造具体命令类型**（或用工厂）；执行路径 **统一走 Invoker**。
 
-## 结构
-
-| 角色 | 代码里是谁 | 管什么 |
-| :--- | :--- | :--- |
-| **命令**（Command） | `Command` 接口 | 声明 `Execute` / `Undo` |
-| **具体命令**（ConcreteCommand） | `AdjustQuantityCommand` 等 | 绑定参数，委托 Receiver |
-| **接收者**（Receiver） | `OrderService` | 真正改订单状态 |
-| **调用者**（Invoker） | `Invoker`、任务队列 Worker | 触发执行，维护历史或队列 |
-| **客户端**（Client） | `AdminHandler`、CLI | 创建命令并交给 Invoker |
-
-```mermaid
-flowchart LR
-    C["Client\nAdminHandler"] --> I["Invoker"]
-    I --> CMD["ConcreteCommand\nAdjustQuantityCommand"]
-    CMD --> R["Receiver\nOrderService"]
-```
-
-宏命令与队列示意：
-
-```mermaid
-flowchart TD
-    Q["CommandQueue"] --> W["Worker / Invoker"]
-    W --> M["MacroCommand"]
-    M --> C1["CancelOrderCommand"]
-    M --> C2["ReleaseInventoryCommand"]
-    C1 --> OS["OrderService"]
-    C2 --> INV["InventoryService"]
-```
-
-### 和 GoF 术语的对应（选读）
-
-| GoF 叫法 | 本文代码 | 一句话 |
-| :--- | :--- | :--- |
-| Command | `Command` | 封装请求的接口 |
-| ConcreteCommand | `AdjustQuantityCommand` | 绑定 Receiver + 参数 |
-| Receiver | `OrderService` | 执行实际操作 |
-| Invoker | `Invoker`、队列 Consumer | 调用 `Execute`，管历史/队列 |
-| Client | `AdminHandler` | 实例化 ConcreteCommand |
-
-Go 无抽象 Command 基类；**接口 + 具体 struct** 即可。宏命令用 **切片组合** 实现 Composite，不必单独 Composite 类型名。
 
 ## 适用场景
 

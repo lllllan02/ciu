@@ -257,42 +257,6 @@ func (p ProductLine) Total() int64 {
 
 [外观模式](/cs-fundamentals/design-patterns/facade) 的 `CheckoutFacade` **不必感知** 享元——它仍收 `[]OrderLine`；享元在 **明细构造层** 或 **Catalog 边界** 注入。
 
-## 结构
-
-| 角色 | 代码里是谁 | 管什么 |
-| :--- | :--- | :--- |
-| **享元**（Flyweight） | `ProductSpec` | **仅存内在状态** + 依赖 ctx 的方法 |
-| **享元工厂**（FlyweightFactory） | `ProductSpecFactory` | 按 SKU **创建 / 缓存 / 返回** 享元 |
-| **外在状态** | `sku`（查工厂用）、`LineContext` | **不** 写入享元；调用时传入或随客户端持有 |
-| **客户端**（Client） | `FlyweightOrderLine`、报表服务 | 维护外在状态，通过工厂使用享元 |
-
-```mermaid
-flowchart TB
-    C["Client\nReportService"] --> F["FlyweightFactory\nProductSpecFactory"]
-    C -->|"LineContext\n(qty, price, orderID)"| FW["Flyweight\nProductSpec"]
-    F -->|"Get(sku)"| FW
-    F --> CAT["CatalogService / DB\nload(sku)"]
-    C -.->|"Amount(ctx)"| FW
-```
-
-**运行时** 汇总百万行同一 SKU 的内存示意：
-
-```go
-factory.Get("tea-001") // 堆上 1 个 ProductSpec
-// 100_000 行 ResolvedOrderLine{ spec: 同一指针, ctx: 各自不同 }
-// vs 100_000 个 OrderLine 各带一份 name/category/taxCode/...
-```
-
-### 和 GoF 术语的对应（选读）
-
-| GoF 叫法 | 本文代码 | 一句话 |
-| :--- | :--- | :--- |
-| Flyweight | `ProductSpec` | **仅存** 内在状态，支持带 ctx 的操作 |
-| FlyweightFactory | `ProductSpecFactory` | 管理享元缓存，避免重复创建 |
-| Client | 报表 / 导出服务 | 保存并使用外在状态 |
-| Unshared extrinsic state | `sku`、`LineContext` | **不** 放进享元，随调用传入 |
-
-Go 无「抽象 Flyweight 接口」硬性要求；当多种享元（`ProductSpec`、`ShippingZoneSpec`）时，可抽 `type Spec interface { Key() string }` 或分工厂。
 
 ## 适用场景
 

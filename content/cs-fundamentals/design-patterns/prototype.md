@@ -191,26 +191,6 @@ func submitBundleReorder(reg *OrderTemplateRegistry, buyer, sku string) error {
 | 扩展 | 新订单模板改多处提交逻辑 | 注册新原型，提交仍 `Clone(name)` |
 | 可读性 | 提交函数里堆赋值 | 「从哪份订单模板来」语义清晰 |
 
-## 结构
-
-| 角色 | 代码里是谁 | 管什么 |
-| :--- | :--- | :--- |
-| **原型** | `OrderPrototype` | 声明 `Clone()` |
-| **具体原型** | `OrderTemplate` | 实现深拷贝与可选的 `SubmitClone` |
-| **注册表**（可选） | `OrderTemplateRegistry` | 按名存取、统一克隆 |
-| **使用者** | `submitBundleReorder` / `Service` | `Clone()` 后只改差异 |
-
-```mermaid
-flowchart LR
-    A["启动时\nBuilder 构建母版"] --> B["原型注册表"]
-    B --> C["运行时 Clone(name)"]
-    C --> D["改买家 / 变量"]
-    D --> E["submit 下单"]
-```
-
-**注册时**：母版构建完成，只读存放（勿在提交路径修改注册表里的实例）。
-
-**克隆时**：得到独立副本，再改买家、渲染变量——原型本身不变。
 
 ## 适用场景
 

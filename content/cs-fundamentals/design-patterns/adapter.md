@@ -180,52 +180,6 @@ stripeSvc := &Service{
 
 新增支付渠道时：**加 Adaptee 的适配器 + 组装处换一行**，不必改 `Service`。
 
-## 结构
-
-| 角色 | 代码里是谁 | 管什么 |
-| :--- | :--- | :--- |
-| **目标**（Target） | `PaymentProcessor` | 客户端期望的接口 |
-| **被适配者**（Adaptee） | `LegacyBankClient`、`StripeClient` | 已有、接口不兼容的组件 |
-| **适配器**（Adapter） | `LegacyBankAdapter` 等 | 实现 Target，持有 Adaptee，做调用翻译 |
-| **客户端**（Client） | `Service` | 只依赖 Target，不知道 Adaptee |
-
-```mermaid
-flowchart LR
-    C["Client\nService"] --> T["Target\nPaymentProcessor"]
-    T --> A["Adapter\nLegacyBankAdapter"]
-    A --> AD["Adaptee\nLegacyBankClient"]
-    C -.->|"只看见 Target"| T
-    A -.->|"翻译 Pay → ChargeCard"| AD
-```
-
-**运行时** 调用链：
-
-```go
-svc.Checkout(order)
-// → processor.Pay(order)          // Target
-// → adapter.bank.ChargeCard(...)        // 适配器内部翻译
-```
-
-与工厂方法组合时的 **组装阶段**：
-
-```mermaid
-flowchart LR
-    M["main / 组装层"] --> N["NewLegacyBankAdapter(...)"]
-    N --> B["PaymentProcessor 实例"]
-    B --> S["Service{processor}"]
-    S --> R["运行时 Checkout"]
-```
-
-### 和 GoF 术语的对应（选读）
-
-| GoF 叫法 | 本文代码 | 一句话 |
-| :--- | :--- | :--- |
-| Target | `PaymentProcessor` | 客户端使用的目标接口 |
-| Adaptee | `LegacyBankClient` | 需要被「接上来」的现有类 |
-| Adapter | `LegacyBankAdapter` | 实现 Target，包装 Adaptee |
-| Client | `Service` | 只依赖 Target 的调用方 |
-
-Go 里 Adapter 几乎都是 **对象适配器**（struct 字段持有 Adaptee）；没有 Java 式 **类适配器**（多重继承同时 IS-A Target 又 IS-A Adaptee）。
 
 ## 适用场景
 

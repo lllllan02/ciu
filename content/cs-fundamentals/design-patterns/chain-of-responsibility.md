@@ -326,46 +326,6 @@ func (s *RefundService) RequestRefund(ctx context.Context, r RefundRequest) erro
 
 测试时注入 **只含两环的短链** 或 **mock 某一环**，无需启动完整 Facade。
 
-## 结构
-
-| 角色 | 代码里是谁 | 管什么 |
-| :--- | :--- | :--- |
-| **处理者**（Handler） | `OrderHandler`、`RefundHandler` | 处理请求的接口；声明 `Handle` |
-| **具体处理者**（ConcreteHandler） | `CartValidator`、`AutoRefundHandler` | 实现检查或审批；决定 **处理 / 转发 / 短路** |
-| **发送者**（Client） | `CheckoutFacade`、`RefundService` | 只把请求交给 **链头** |
-| **请求**（Request） | `PlaceOrderContext`、`RefundContext` | 在链上传递的上下文 |
-
-```mermaid
-flowchart LR
-    C["Client\nCheckoutFacade"] --> H1["ConcreteHandler\nCartValidator"]
-    H1 --> H2["InventoryValidator"]
-    H2 --> H3["CouponValidator"]
-    H3 --> H4["FraudValidator"]
-    H4 --> CORE["placeOrderCore"]
-```
-
-退款单处理者示意：
-
-```mermaid
-flowchart TD
-    R["RefundService"] --> A["AutoRefundHandler"]
-    A -->|"金额 > 限额"| S["SupervisorHandler"]
-    A -->|"金额 ≤ 限额"| DONE1["Approved / 结束"]
-    S -->|"金额 > 主管限额"| F["FinanceHandler"]
-    S -->|"金额 ≤ 主管限额"| DONE2["Approved / 结束"]
-    F --> DONE3["Approved / 结束"]
-```
-
-### 和 GoF 术语的对应（选读）
-
-| GoF 叫法 | 本文代码 | 一句话 |
-| :--- | :--- | :--- |
-| Handler | `OrderHandler` | 定义 `Handle` 与可选 `SetNext` |
-| ConcreteHandler | `FraudValidator` 等 | 实现具体规则 |
-| Client | `CheckoutFacade` | 仅依赖链头 Handler |
-| Successor | `next` 字段 | 链上下一环 |
-
-Go 无抽象 Handler 基类；常用 **嵌入 `BaseHandler`** 复用 `callNext`。也可用 **切片 + for 循环** 实现管道（见 [组装实践](#组装实践)），语义仍是责任链，只是 **不用指针串 next**。
 
 ## 适用场景
 

@@ -318,51 +318,6 @@ worker := &OrderRetryWorker{checkout: facade}
 
 新增 `RiskService.Check` → **只改** `CheckoutFacade.PlaceOrder` 一处；三个入口 **都不改**。这才是与「问题」里单 Controller 写法对比时，Facade 代码 **看起来一样** 却 **仍然值得** 的原因。
 
-## 结构
-
-| 角色 | 代码里是谁 | 管什么 |
-| :--- | :--- | :--- |
-| **外观**（Facade） | `CheckoutFacade` | 对外的粗粒度 `PlaceOrder`，编排子系统 |
-| **子系统**（Subsystem） | `InventoryService`、`PaymentProcessor` 等 | 各自领域能力，可被其他入口单独使用 |
-| **客户端**（Client） | `CheckoutController`、MQ 消费者 | 只依赖 Facade，不直接碰子系统 |
-
-```mermaid
-flowchart TB
-    C["Client\nCheckoutController"] --> F["Facade\nCheckoutFacade"]
-    F --> S1["Subsystem\nInventoryService"]
-    F --> S2["Subsystem\nPricingEngine"]
-    F --> S3["Subsystem\nPaymentProcessor"]
-    F --> S4["Subsystem\nOrderRepository"]
-    F --> S5["Subsystem\nNotificationService"]
-    F --> S6["Subsystem\nInvoiceService"]
-    F --> S7["Subsystem\nAuditService"]
-    C -.->|"PlaceOrder(req)"| F
-    F -.->|"Reserve → Total → Pay → Save → …"| S1
-```
-
-**运行时** 一次成功下单的调用顺序：
-
-```go
-facade.PlaceOrder(ctx, req)
-// → line.Validate() × N                    // 仍可在 Facade 或 Validator 子系统
-// → inventory.Reserve(lines)
-// → pricing.Total(lines)
-// → payment.Pay(order)
-// → orders.Save(ctx, order)
-// → notify / invoice / audit（按约定同步或异步）
-```
-
-子系统之间 **不直接互调**（理想情况下）——都通过 Facade 编排，避免网状依赖。
-
-### 和 GoF 术语的对应（选读）
-
-| GoF 叫法 | 本文代码 | 一句话 |
-| :--- | :--- | :--- |
-| Facade | `CheckoutFacade` | 简化入口，编排 Subsystem |
-| Subsystem classes | `InventoryService` 等 | 原有复杂接口，可独立存在 |
-| Client | `CheckoutController` | 只通过 Facade 使用子系统 |
-
-Go 里 Facade 通常是 **struct 组合多个 interface**；不必继承「抽象 Facade 基类」。
 
 ## 适用场景
 

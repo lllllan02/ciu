@@ -290,46 +290,6 @@ func NewOrderModule(/* deps */) *OrderService {
 
 [外观](/cs-fundamentals/design-patterns/facade) `PlaceOrderCore` 在落库后 **同样 Publish** `OrderPlaced` / `OrderPaid`——**一处注册 Observer**，HTTP 与 MQ 入口 **共享**。
 
-## 结构
-
-| 角色 | 代码里是谁 | 管什么 |
-| :--- | :--- | :--- |
-| **主题**（Subject） | `EventPublisher`、`Order`（可选） | 维护订阅、Notify |
-| **观察者**（Observer） | `Observer` 接口 | `Handle` 事件 |
-| **具体观察者**（ConcreteObserver） | `EmailNotifier`、`SearchIndexer` | 单一副作用 |
-| **具体主题**（ConcreteSubject） | `OrderService` 内 Publish | 状态变更后发布 |
-| **客户端**（Client） | 组装层 `NewOrderModule` | Subscribe 注册 |
-
-```mermaid
-flowchart TD
-    OS["OrderService\nMarkPaid"] --> P["EventPublisher"]
-    P --> E["EmailNotifier"]
-    P --> S["SearchIndexer"]
-    P --> L["LoyaltyAccruer"]
-    P --> A["AuditLogger"]
-```
-
-对比 **硬编码扇出**：
-
-```mermaid
-flowchart TD
-    OS2["OrderService"] --> EM["EmailService"]
-    OS2 --> SR["SearchService"]
-    OS2 --> LO["LoyaltyService"]
-    OS2 --> AU["AuditService"]
-```
-
-### 和 GoF 术语的对应（选读）
-
-| GoF 叫法 | 本文代码 | 一句话 |
-| :--- | :--- | :--- |
-| Subject | `EventPublisher` | 维护 Observer 列表 |
-| Observer | `Observer` | 更新接口 |
-| ConcreteSubject | `OrderService`（Publish 侧） | 状态变更源 |
-| ConcreteObserver | `EmailNotifier` 等 | 具体响应 |
-| Client | 组装层 | Subscribe |
-
-Go 常用 **领域事件 + 函数式 handler** 代替 **继承 Subject**——思想一致。
 
 ## 适用场景
 

@@ -269,35 +269,6 @@ func ResolveShippingStrategy(channel string, order Order) ShippingStrategy {
 
 解析逻辑 **集中在 Resolver**；Engine **只算**——符合 [依赖倒置](/cs-fundamentals/design-patterns#设计原则)。
 
-## 结构
-
-| 角色 | 代码里是谁 | 管什么 |
-| :--- | :--- | :--- |
-| **策略**（Strategy） | `PricingStrategy` 接口 | 算法族 API |
-| **具体策略**（ConcreteStrategy） | `MemberPricingStrategy` 等 | 一种规则 |
-| **上下文**（Context） | `PricingEngine` | 持有 Strategy、委托 Calculate |
-| **客户端**（Client） | `CheckoutService`、Resolver | 选策略、调 Context |
-
-```mermaid
-flowchart LR
-    C["Client\nCheckoutService"] --> R["Resolver"]
-    R --> E["Context\nPricingEngine"]
-    E --> S["Strategy\nPricingStrategy"]
-    S --> M["MemberPricingStrategy"]
-    S --> F["FlashSalePricingStrategy"]
-    S --> ST["StandardPricingStrategy"]
-```
-
-### 和 GoF 术语的对应（选读）
-
-| GoF 叫法 | 本文代码 | 一句话 |
-| :--- | :--- | :--- |
-| Strategy | `PricingStrategy` | 可互换算法 |
-| ConcreteStrategy | `FlashSalePricingStrategy` | 具体算法 |
-| Context | `PricingEngine` | 委托 Strategy |
-| Client | Resolver + Checkout | 配置与调用 |
-
-Go 常用 **函数类型** `type PricingFunc func(...) int64` 作 **轻量 Strategy**；复杂规则 **仍用 struct** 便于 **注入依赖**（Catalog、Rates）。
 
 ## 适用场景
 

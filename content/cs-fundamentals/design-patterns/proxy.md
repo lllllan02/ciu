@@ -295,43 +295,6 @@ adminHandler := &AdminHandler{repo: repo}
 
 客户端 **只依赖** `OrderRepository`；测试时 `repo` 换为 **内存 fake**，无需 DB、gRPC、Redis。
 
-## 结构
-
-| 角色 | 代码里是谁 | 管什么 |
-| :--- | :--- | :--- |
-| **主题**（Subject） | `OrderRepository` 接口 | 定义 **真实对象与代理共用** 的契约 |
-| **真实主题**（Real Subject） | `SQLOrderRepository` | **实际** 业务与持久化 |
-| **代理**（Proxy） | `ProtectionProxy`、`LazyOrderProxy`、`RemoteInventoryProxy` | **同接口**；控制访问后 **委托** real |
-| **客户端**（Client） | `AdminHandler`、`CheckoutFacade` | 只认 Subject 接口 |
-
-```mermaid
-flowchart LR
-    C["Client\nAdminHandler"] --> P["Proxy\nProtectionProxy"]
-    P --> VP["Proxy\nLazyOrderProxy"]
-    VP --> R["RealSubject\nSQLOrderRepository"]
-    P --> AUTH["AuthChecker"]
-    R --> DB[(Database)]
-```
-
-远程 / 缓存库存链示意：
-
-```mermaid
-flowchart LR
-    F["CheckoutFacade"] --> CI["CachingInventoryProxy"]
-    CI --> RI["RemoteInventoryProxy"]
-    RI --> GRPC["Inventory gRPC"]
-```
-
-### 和 GoF 术语的对应（选读）
-
-| GoF 叫法 | 本文代码 | 一句话 |
-| :--- | :--- | :--- |
-| Subject | `OrderRepository` | 代理与真实主题 **共享** 的接口 |
-| RealSubject | `SQLOrderRepository` | 真正干活的实现 |
-| Proxy | `ProtectionProxy` 等 | **控制访问** 并转发 |
-| Client | Handler、Facade | 通过 Subject 接口调用 |
-
-Go 无内置动态代理；常用 **显式 struct + 组合**。接口方法多时，可 **按Concern 拆多个代理** 再 **手动链式包装**，或生成代码（需谨慎）。
 
 ## 适用场景
 

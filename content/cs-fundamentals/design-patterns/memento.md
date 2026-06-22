@@ -269,37 +269,6 @@ func (s *EditSession) AutoSave(label string) {
 
 用户 **改地址、改券、改明细** 可仍走 [命令](/cs-fundamentals/design-patterns/command) **逐步落库**；**会话级回滚** 调 `UndoCheckpoint()` **整包恢复**。
 
-## 结构
-
-| 角色 | 代码里是谁 | 管什么 |
-| :--- | :--- | :--- |
-| **发起人**（Originator） | `OrderDraft` | `Save` / `Restore`；深拷贝与不变量 |
-| **备忘录**（Memento） | `Snapshot` / `Memento` 接口 | 存状态；对外 opaque |
-| **保管者**（Caretaker） | `History`、`DraftStore` | 存 Memento 栈/列表，不解析 |
-| **客户端**（Client） | `EditSession`、Admin UI | 触发 Save/Restore |
-
-```mermaid
-flowchart LR
-    C["Client\nEditSession"]
-    O["Originator\nOrderDraft"]
-    M["Memento\nSnapshot"]
-    H["Caretaker\nHistory"]
-    C --> O
-    O -->|"Save()"| M
-    M --> H
-    H -->|"Pop → Restore()"| O
-```
-
-### 和 GoF 术语的对应（选读）
-
-| GoF 叫法 | 本文代码 | 一句话 |
-| :--- | :--- | :--- |
-| Originator | `OrderDraft` | 创建/消费 Memento |
-| Memento | `Snapshot` | 存内部状态 |
-| Caretaker | `History` | 保管 Memento，不碰内容 |
-| Client | `EditSession` | 编排 Save/Restore |
-
-Go **无 friend**：用 **同包小写字段** 或 **bytes + 包内 Deserialize** 实现 **窄接口**。
 
 ## 适用场景
 

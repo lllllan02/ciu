@@ -268,49 +268,6 @@ func ExportPickList(order OrderLines) []PickItem {
 
 **Checkout** 仍调 `line.Total()`（组合内聚）；**报表/WMS** 调 **Visitor**——**核心写路径** 与 **读模型导出** 分层。
 
-## 结构
-
-| 角色 | 代码里是谁 | 管什么 |
-| :--- | :--- | :--- |
-| **访问者**（Visitor） | `OrderLineVisitor` | 各 `VisitXxx` |
-| **具体访问者**（ConcreteVisitor） | `PickListExporter`、`JSONExporter` | 一种完整操作 |
-| **元素**（Element） | `OrderLine` | `Accept` |
-| **具体元素**（ConcreteElement） | `ProductLine`、`BundleLine` | 回调 Visitor |
-| **对象结构**（ObjectStructure） | `OrderLines` | 持有元素集合 |
-| **客户端**（Client） | WMS、报表服务 | 创建 Visitor、`AcceptAll` |
-
-```mermaid
-flowchart TD
-    C["Client\nExportPickList"] --> O["OrderLines\nAcceptAll"]
-    O --> L["OrderLine.Accept"]
-    L --> V["PickListExporter"]
-    V --> VP["VisitProduct"]
-    V --> VB["VisitBundle"]
-    L --> C2["Children.Accept"]
-```
-
-双重分派：
-
-```mermaid
-sequenceDiagram
-    participant Client
-    participant ProductLine
-    participant Visitor
-    Client->>ProductLine: Accept(visitor)
-    ProductLine->>Visitor: VisitProduct(p)
-```
-
-### 和 GoF 术语的对应（选读）
-
-| GoF 叫法 | 本文代码 | 一句话 |
-| :--- | :--- | :--- |
-| Visitor | `OrderLineVisitor` | 操作接口 |
-| ConcreteVisitor | `PickListExporter` | 具体导出 |
-| Element | `OrderLine` | Accept |
-| ConcreteElement | `ProductLine` | 分派 Visit |
-| ObjectStructure | `OrderLines` | 元素集合 |
-
-Go **无重载**：`VisitProduct` / `VisitBundle` **不同方法名** 实现双重分派。
 
 ## 适用场景
 

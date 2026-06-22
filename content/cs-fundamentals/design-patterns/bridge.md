@@ -241,49 +241,6 @@ _ = stripeRefund.Refund("order-001", "用户取消订单")
 
 新增 **支付后端** → 只加 `PaymentBackend` 实现；新增 **支付请求形态** → 只加 refined `CheckoutAPI`；**不必** 为每种组合写 `AlipayRefundPaymentProcessor`。
 
-## 结构
-
-| 角色 | 代码里是谁 | 管什么 |
-| :--- | :--- | :--- |
-| **抽象**（Abstraction） | `CheckoutAPI` | 面向业务的提交 API，持有 Implementor |
-| **refined 抽象** | `InstallmentCheckoutAPI`、`RefundCheckoutAPI` | 在基类抽象上扩展分期、退款等请求编排逻辑 |
-| **实现**（Implementor） | `PaymentBackend` | 与请求形态无关的底层支付接口 |
-| **具体实现** | `AlipayBackend`、`WeChatPayBackend` | 各支付后端的真实 I/O |
-| **客户端**（Client） | `CheckoutService`、组装层 | 依赖抽象 API，组装时绑定 Implementor |
-
-```mermaid
-flowchart TB
-    C["Client\nCheckoutService"] --> A["Abstraction\nCheckoutAPI"]
-    A --> R1["Refined\nInstallmentCheckoutAPI"]
-    A --> R2["Refined\nRefundCheckoutAPI"]
-    A --> I["Implementor\nPaymentBackend"]
-    I --> E["AlipayBackend"]
-    I --> S["WeChatPayBackend"]
-    I --> P["StripeBackend"]
-    C -.->|"只看见 Checkout API"| A
-    A -.->|"Charge(orderID, request)"| I
-```
-
-**运行时** 调用链（订单模板 + 微信支付）：
-
-```go
-wechatInstallment.CheckoutWithVars(orderID, vars)
-// → renderTemplate(...)              // Refined Abstraction
-// → CheckoutAPI.Checkout(orderID, request)           // Abstraction
-// → backend.Charge(orderID, request)        // Implementor → AlipayBackend / WeChatPayBackend …
-```
-
-### 和 GoF 术语的对应（选读）
-
-| GoF 叫法 | 本文代码 | 一句话 |
-| :--- | :--- | :--- |
-| Abstraction | `CheckoutAPI` | 高层接口，持有 Implementor |
-| RefinedAbstraction | `InstallmentCheckoutAPI` | 扩展抽象行为 |
-| Implementor | `PaymentBackend` | 实现层接口 |
-| ConcreteImplementor | `AlipayBackend` 等 | 具体支付后端 |
-| Client | `CheckoutService` | 使用抽象，组装时注入 backend |
-
-Go 无继承：`RefinedAbstraction` 用 **嵌入** `CheckoutAPI` 复用 `Send`，而不是 `extends`。
 
 ## 适用场景
 

@@ -193,28 +193,6 @@ func submitOrder(reg *OrderTemplateRegistry, buyer, orderID string) error {
 | 调用方 | 要知道如何组装 hub | `Instance().Checkout(…)` |
 | 测试 | 难以替换全局依赖 | `Configure(mock)` 或注入接口（见下文） |
 
-## 结构
-
-| 角色 | 代码里是谁 | 管什么 |
-| :--- | :--- | :--- |
-| **单例类** | `CheckoutHub` | 唯一实例承载的业务（派发、限流、指标） |
-| **静态实例** | `hubInstance` + `hubOnce` | 保存唯一指针；`sync.Once` 保证初始化一次 |
-| **全局访问点** | `Instance()` / `GetHub()` | 对外返回同一实例 |
-| **使用者** | `submitOrder` 等 | 通过访问点获取，不 `New` |
-
-```mermaid
-flowchart TB
-    A["main / Configure\n注入支付渠道实现"] --> B["sync.Once\n首次初始化"]
-    B --> C["CheckoutHub\n唯一实例"]
-    D["submitOrder"] --> E["Instance()"]
-    E --> C
-    F["submitRefund"] --> E
-    C --> G["限流 + 路由 + 指标"]
-```
-
-**初始化时**：`hubOnce.Do` 内完成支付渠道绑定、限流器与 metrics 创建——只执行一次。
-
-**运行时**：所有提交路径经同一 `Instance()` 进入，共享限流与连接。
 
 ## 适用场景
 

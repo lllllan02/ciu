@@ -162,56 +162,6 @@ func NewPayPalProcessor() PaymentProcessor { return &PayPalProcessor{} }
 paypalSvc := &Service{processor: NewPayPalProcessor()}
 ```
 
-## 结构
-
-下面用表格把上一节三个角色再捋一遍（不是新概念，而是复习）：
-
-| 角色 | 代码里是谁 | 管什么 |
-| :--- | :--- | :--- |
-| **产品** | `PaymentProcessor` 及其实现 | 业务真正要用的能力，比如 `Pay()` |
-| **工厂方法** | `NewAlipayProcessor()` 等 | 负责构造并返回对应的产品 |
-| **使用者** | `Service` | 只拿产品来用，不管产品从哪来 |
-
-容易混的一点是：**创建** 和 **使用** 发生在两个不同阶段：
-
-```mermaid
-flowchart LR
-    A["main / 组装层\n选 NewXxx()"] --> B["产品\nPaymentProcessor"]
-    B --> C["使用者\nService"]
-    C --> D["业务\nCheckout → Pay()"]
-```
-
-**启动 / 组装时**（`main`）：选好支付渠道，调构造函数，把造好的产品塞进 `Service`：
-
-```go
-alipaySvc := &Service{processor: NewAlipayProcessor()}
-//                   ↑ 这里注入           ↑ 这里创建
-```
-
-**运行时**（`Checkout`）：`Service` 只管调用，不再碰构造函数，也不再出现 `AlipayProcessor` 这类具体名字：
-
-```go
-func (s *Service) Checkout(order Order) error {
-    s.processor.Pay(order) // 只知道这是个 PaymentProcessor
-    return nil
-}
-```
-
-和简单工厂的关键差别不在「有没有工厂」，而在 **谁决定造哪种产品**：简单工厂是运行时传 `method`、函数里 `switch`；工厂方法是 **启动时** 在 `main` 里选定调用哪个 `NewXxx()`，业务代码从此不再参与选型。
-
-### 和 GoF 术语的对应（选读）
-
-读 Java 资料时可能会看到这些英文名，和本文 Go 代码的对应关系如下：
-
-| GoF 叫法 | 本文代码 | 一句话 |
-| :--- | :--- | :--- |
-| Product | `PaymentProcessor` | 产品接口 |
-| ConcreteProduct | `AlipayProcessor` 等 | 具体产品 |
-| Creator | `func() PaymentProcessor` 或含 `Create()` 的接口 | 工厂方法的抽象（Go 里常用函数签名表达） |
-| ConcreteCreator | `NewAlipayProcessor()` 等 | 具体工厂方法 |
-| Client | `Service` | 只依赖产品接口的使用方 |
-
-`main` 不算 GoF 里的 Client，它是 **组装根**：在程序入口完成「选构造函数 → 创建 → 注入」，之后 `Service` 就按普通业务代码运行了。
 
 ## 适用场景
 

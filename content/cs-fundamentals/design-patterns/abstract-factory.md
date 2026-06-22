@@ -216,52 +216,6 @@ func NewWeChatCheckoutSuite() CheckoutSuite {
 wechatSvc := NewService(NewWeChatCheckoutSuite())
 ```
 
-## 结构
-
-| 角色 | 代码里是谁 | 管什么 |
-| :--- | :--- | :--- |
-| **抽象产品** | `PaymentProcessor`、`ReceiptLogger`、`InvoiceTemplate` | 各产品族的统一接口 |
-| **具体产品** | `AlipayProcessor`、`AuditReceiptLogger` 等 | 某一族里的具体实现 |
-| **抽象工厂** | `CheckoutSuite` | 一族产品的抽象容器（三个产品接口字段） |
-| **具体工厂** | `NewDomesticCheckoutSuite()` 等 | 组装函数，配好一族具体实现 |
-| **使用者** | `Service` | 只依赖 `CheckoutSuite` 及各产品接口 |
-
-创建与使用分两个阶段：
-
-```mermaid
-flowchart LR
-    A["main / 组装层\n选 NewXxxSuite()"] --> B["套装\nCheckoutSuite"]
-    B --> C["使用者\nService"]
-    C --> D["业务\nCheckout"]
-```
-
-**启动 / 组装时**：选定套装，三个产品字段在此配好并注入 `Service`：
-
-```go
-svc := NewService(NewDomesticCheckoutSuite())
-//              ↑ 选族          ↑ PaymentProcessor / ReceiptLogger / InvoiceTemplate 在此注入
-```
-
-**运行时**：`Service` 只调接口方法，不出现 `AlipayProcessor` 等具体名字，也不再参与选型。
-
-### 和工厂方法的关系（选读）
-
-抽象工厂 **不是** 工厂方法的替代品，而是 **在其之上的组合**：
-
-- 工厂方法：解耦 **一种** 产品的创建（`NewAlipayProcessor()`）。
-- 抽象工厂：把一族产品 **打包进一个 struct**，保证 **成套** 使用。
-
-若项目里只有一种产品、没有「族」的概念，用工厂方法即可，不必上抽象工厂。
-
-### 和 GoF 术语的对应（选读）
-
-| GoF 叫法 | 本文代码 | 一句话 |
-| :--- | :--- | :--- |
-| AbstractProduct | `PaymentProcessor` 等 | 产品接口 |
-| ConcreteProduct | `AlipayProcessor` 等 | 具体产品 |
-| AbstractFactory | `CheckoutSuite` | 一族产品的抽象容器 |
-| ConcreteFactory | `NewDomesticCheckoutSuite()` 等 | 组装函数，配好一族实现 |
-| Client | `Service` | 只通过套装使用产品族 |
 
 ## 适用场景
 

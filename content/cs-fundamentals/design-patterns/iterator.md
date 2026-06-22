@@ -359,44 +359,6 @@ func enqueueCancelPaidExpired(ctx context.Context, repo OrderRepository, q *Comm
 
 Client **只依赖** `Iterator[Order]`，不依赖 `[]Order`。
 
-## 结构
-
-| 角色 | 代码里是谁 | 管什么 |
-| :--- | :--- | :--- |
-| **迭代器**（Iterator） | `Iterator[T]` 接口 | `HasNext` / `Next` |
-| **具体迭代器**（ConcreteIterator） | `LeafSKUIterator`、`FilteredOrderIterator` | 遍历状态与策略 |
-| **聚合**（Aggregate） | `OrderLines`、`OrderRepository` | 创建 Iterator，隐藏存储 |
-| **具体聚合**（ConcreteAggregate） | `InMemoryOrder`、`SQLAuditRepo` | 持有真实数据 |
-| **客户端**（Client） | 报表、导出、批处理 Worker | 只通过 Iterator 访问 |
-
-```mermaid
-flowchart LR
-    C["Client\nReportService"] --> I["Iterator\nFilteredOrderIterator"]
-    A["Aggregate\nOrderRepository"] --> I
-    I --> E["Element\nOrder / PickItem"]
-```
-
-明细树多种迭代器：
-
-```mermaid
-flowchart TD
-    OL["OrderLines\nInMemoryOrder"] --> D["DepthFirstLineIterator"]
-    OL --> L["LeafSKUIterator"]
-    D --> LN["OrderLine 节点"]
-    L --> PI["PickItem 叶子"]
-```
-
-### 和 GoF 术语的对应（选读）
-
-| GoF 叫法 | 本文代码 | 一句话 |
-| :--- | :--- | :--- |
-| Iterator | `Iterator[T]` | 顺序访问元素 |
-| ConcreteIterator | `LeafSKUIterator` | 具体遍历算法 |
-| Aggregate | `OrderLines`、`OrderRepository` | 创建 Iterator |
-| ConcreteAggregate | `InMemoryOrder` | 实际集合 |
-| Client | `ReportService` | 使用 Iterator |
-
-Go 常用 **泛型 `Iterator[T]`** 或 **`iter.Seq[T]`** 代替 GoF 的 **非泛型 Iterator + 手动类型断言**。
 
 ## 适用场景
 

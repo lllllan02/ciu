@@ -296,52 +296,6 @@ _ = svc.Checkout()
 
 新增 **积分抵扣** → 只加 `PointsLine` 装饰器，`CheckoutService` **不必改**。
 
-## 结构
-
-| 角色 | 代码里是谁 | 管什么 |
-| :--- | :--- | :--- |
-| **组件**（Component） | `OrderLine` | 装饰器与具体组件的统一接口 |
-| **具体组件**（Concrete Component） | `ProductLine` | 核心明细逻辑，可被装饰 |
-| **装饰器**（Decorator） | `MemberDiscountLine`、`CouponLine`、`GiftWrapLine` | 持有 `inner`，委托并增强 |
-| **客户端**（Client） | `CheckoutService`、组装函数 | 只依赖 `OrderLine`，在组装层套娃 |
-
-```mermaid
-flowchart LR
-    C["Client\nCheckoutService"] --> I["Component\nOrderLine"]
-    I --> P["ConcreteComponent\nProductLine"]
-    I --> D1["Decorator\nMemberDiscountLine"]
-    I --> D2["Decorator\nCouponLine"]
-    I --> D3["Decorator\nGiftWrapLine"]
-    D3 --> D2
-    D2 --> D1
-    D1 --> P
-    C -.->|"Total / Validate / Reserve"| I
-    D1 -.->|"委托 inner"| I
-```
-
-**运行时** 对套了三层的行调用 `Total()`：
-
-```go
-GiftWrapLine{Inner: CouponLine{Inner: MemberDiscountLine{Inner: ProductLine{UnitPrice: 8800, Quantity: 1}, DiscountBP: 9500}, Off: 1000}, Fee: 500}.Total()
-// → GiftWrap: inner.Total() + 500
-//     → Coupon: inner.Total() - 1000
-//         → Member: inner.Total() * 9500 / 10000  // ProductLine: 8800 → 8360
-//     → 7360
-// → 7860
-```
-
-装饰顺序 **影响结果**（先打折再满减 vs 先满减再打折）——这是业务规则，应在组装层或文档里约定，而不是藏在 `ProductLine` 里。
-
-### 和 GoF 术语的对应（选读）
-
-| GoF 叫法 | 本文代码 | 一句话 |
-| :--- | :--- | :--- |
-| Component | `OrderLine` | 统一接口 |
-| ConcreteComponent | `ProductLine` | 被装饰的核心对象 |
-| Decorator | `MemberDiscountLine` 等 | 持有 Component，增强行为 |
-| Client | `CheckoutService` | 只通过 Component 操作，组装层负责套娃 |
-
-Go 无继承：每个装饰器 **独立 struct**，显式持有 `Inner OrderLine`；也可用 **函数式** 包装（见 [组装实践 · 函数式装饰](#函数式装饰)）。
 
 ## 适用场景
 

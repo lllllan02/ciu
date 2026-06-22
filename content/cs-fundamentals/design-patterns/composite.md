@@ -228,46 +228,6 @@ _ = svc.Checkout() // 11800，无需 if bundle
 
 新增 **赠品行**、**虚拟 bundle** → 新实现 `OrderLine`，`CheckoutService` **不必改**。
 
-## 结构
-
-| 角色 | 代码里是谁 | 管什么 |
-| :--- | :--- | :--- |
-| **组件**（Component） | `OrderLine` | 叶子与组合的统一接口 |
-| **叶子**（Leaf） | `ProductLine` | 不可再分的明细，执行具体 I/O |
-| **组合**（Composite） | `BundleLine` | 持有 `[]OrderLine`，递归聚合/转发 |
-| **客户端**（Client） | `CheckoutService` | 只依赖 `OrderLine`，遍历根列表 |
-
-```mermaid
-flowchart TB
-    C["Client\nCheckoutService"] --> I["Component\nOrderLine"]
-    I --> L["Leaf\nProductLine"]
-    I --> B["Composite\nBundleLine"]
-    B --> I
-    B --> L
-    C -.->|"Total / Validate / Reserve"| I
-    B -.->|"递归调用 child.Total() 等"| I
-```
-
-**运行时** 对礼盒调用 `Total()`：
-
-```go
-giftBox.Total()
-// → child[0].Total()                    // ProductLine: 8800
-// → child[1].Total()                    // BundleLine
-//     → grandchild[0].Total()           // ProductLine: 3000
-// → 8800 + 3000 = 11800
-```
-
-### 和 GoF 术语的对应（选读）
-
-| GoF 叫法 | 本文代码 | 一句话 |
-| :--- | :--- | :--- |
-| Component | `OrderLine` | 统一接口 |
-| Leaf | `ProductLine` | 叶子，无子节点 |
-| Composite | `BundleLine` | 容器，持有子 Component |
-| Client | `CheckoutService` | 只通过 Component 操作树 |
-
-Go 无继承：`BundleLine` 与 `ProductLine` **各自实现** `OrderLine`；子节点类型是 `OrderLine` 接口，天然支持任意深度嵌套。
 
 ## 适用场景
 

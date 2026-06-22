@@ -373,50 +373,6 @@ func (s *OrderService) load(ctx context.Context, id string) (*Order, error) {
 
 HTTP、MQ、CLI **统一** `order.Pay()`——**无 switch**。
 
-## 结构
-
-| 角色 | 代码里是谁 | 管什么 |
-| :--- | :--- | :--- |
-| **上下文**（Context） | `Order` | 委托、持有 State、持久化、Publish |
-| **状态**（State） | `OrderState` 接口 | 各操作在本态的行为 |
-| **具体状态**（ConcreteState） | `PendingState`、`PaidState`… | 允许/拒绝、迁移 |
-| **客户端**（Client） | `OrderService`、Handler | 加载 Context、调统一 API |
-
-```mermaid
-flowchart LR
-    C["Client\nOrderService"] --> O["Context\nOrder"]
-    O --> S["State\nOrderState"]
-    S --> P["PendingState"]
-    S --> PD["PaidState"]
-    S --> SH["ShippedState"]
-    P -->|"Pay success"| PD
-    PD -->|"Ship"| SH
-```
-
-状态迁移示意：
-
-```mermaid
-stateDiagram-v2
-    [*] --> pending
-    pending --> paid : Pay
-    pending --> cancelled : Cancel
-    paid --> shipped : Ship
-    paid --> cancelled : Cancel/Refund
-    shipped --> completed : ConfirmReceipt
-    cancelled --> [*]
-    completed --> [*]
-```
-
-### 和 GoF 术语的对应（选读）
-
-| GoF 叫法 | 本文代码 | 一句话 |
-| :--- | :--- | :--- |
-| Context | `Order` | 委托给 State |
-| State | `OrderState` | 状态接口 |
-| ConcreteState | `PaidState` 等 | 具体行为与迁移 |
-| Client | `OrderService` | 使用 Context |
-
-Go **State 常用 struct 值类型**（无字段）+ **Context 指针**；可 **单例 State**（空 struct 复用）。
 
 ## 适用场景
 
