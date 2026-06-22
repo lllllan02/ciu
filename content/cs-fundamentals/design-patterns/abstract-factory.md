@@ -5,72 +5,41 @@ order: 2
 
 **抽象工厂模式** 提供一种创建 **一族相关对象** 的方式，使业务代码只依赖各产品的统一接口，而不必关心这一族具体由哪套实现组成；**选哪一套、怎么造**，在程序 **启动时**（`main` 或组装层）由对应的抽象工厂决定。
 
-在电商订单系统里，一次结算会同时用到支付渠道、日志和订单模板，且必须对应同一部署场景：国内版是支付宝 + 审计日志 + 增值税发票模板，跨境版是信用卡 + 埋点日志 + 短文案收据——混搭（例如支付宝配跨境短收据）会导致收据格式、日志规范或支付流程对不上。业务代码只依赖统一接口完成结算；用哪一套，在部署/组装阶段定好，而不是运行时从各渠道随意组合。
-
-下文延续 [工厂方法模式](/cs-fundamentals/design-patterns/factory)：上一篇只选 **一个** `PaymentProcessor`，这一篇把问题扩展为 **结算套装**——一族相关产品的配对，不是单条订单明细如何拼出来。
-
 ## 问题
 
-[工厂方法模式](/cs-fundamentals/design-patterns/factory) 解决的是「创建 **一种** 产品」的解耦问题。实际项目里，对象往往 **成组出现**，且组内成员必须匹配：
+[工厂方法模式](/cs-fundamentals/design-patterns/factory) 解决的是「创建 **一种** 产品」的解耦问题。实际项目里，很多对象不是单独用的，而是 **成套出现**，且组内成员必须风格一致——就像买家具：沙发、茶几、电视柜要同一套配色，不能混搭。
 
-- 国内版订单：支付宝支付渠道 + 审计日志 + 正式 HTML 订单模板
-- 跨境版订单：信用卡支付渠道 + 埋点日志 + 短文案订单模板
+继续用订单结算举例。国内版和跨境版各自是一套完整流程：
 
-若在每个用到的地方分别 `new` 具体类型，很容易出现 **混搭**——例如国内支付宝配了跨境短订单模板，或信用卡支付渠道配了审计日志，运行时才发现不兼容。
+- **国内版**：支付宝支付 + 审计日志 + 正式 HTML 订单模板
+- **跨境版**：信用卡支付 + 埋点日志 + 短文案订单模板
+
+业务代码真正需要的，是「按版本拿一整套来用」。最直接的做法，是在每个用到的地方分别判断、分别 `new` 三个具体类型。类型少时还能应付；一旦创建点变多，问题就会一起暴露：
+
+1. **容易配错组合**：三个组件分散创建，改一处、漏一处，就可能出现「国内支付宝 + 跨境短模板」这类混搭，运行时才发现不兼容。
+2. **调用方与多套具体类紧耦合**：业务代码必须认识每一族里的所有具体类型名，违反 [依赖倒置](/cs-fundamentals/design-patterns#设计原则)（依赖抽象，而非具体实现）。
+3. **扩展与切换成本高**：新增「国内微信套装」要在多处同步改 `if/else`；从国内版切到跨境版，本应是「一键换族」，分散的 `new` 却变成全局搜索替换。
+
+本质矛盾是：**使用方只关心「拿来用一整套」**，却不得不同时维护 **「族内有哪些产品、怎么配对」** 的细节。典型写法如下——结算、退款、对账等处往往各写一遍：
 
 ```go
-func submitOrder(suite string, order Order) {
-    var processor PaymentProcessor
-    var logger ReceiptLogger
-    var invoiceTpl InvoiceTemplate
-
-    if suite == "domestic" {
-        processor = &AlipayProcessor{}
-        logger = &AuditReceiptLogger{}
-        invoiceTpl = &VATInvoiceTemplate{}
-    } else if suite == "cross_border" {
-        processor = &CreditCardProcessor{}
-        logger = &AnalyticsReceiptLogger{}
-        invoiceTpl = &MobileReceiptTemplate{}
-    }
-    // 若三行分别来自不同分支、不同文件，极易配错组合…
-    body := invoiceTpl.Render(order)
-    processor.Pay(order)
-    logger.Record("checkout", body)
+if suite == "domestic" {
+    processor = &AlipayProcessor{}
+    logger = &AuditReceiptLogger{}
+    invoiceTpl = &VATInvoiceTemplate{}
+} else if suite == "cross_border" {
+    processor = &CreditCardProcessor{}
+    logger = &AnalyticsReceiptLogger{}
+    invoiceTpl = &MobileReceiptTemplate{}
 }
+// 三行若来自不同文件、不同人维护，极易混搭不同族的产品
 ```
-
-这种写法的问题：
-
-1. **族内一致性难保证**：`PaymentProcessor`、`ReceiptLogger`、`InvoiceTemplate` 分散创建，新增「国内微信套装」时要在多处同步改 `if/else`，漏改一处就会混用不同族的产品。
-2. **调用方与多套具体类紧耦合**：业务代码必须知道每一族里有哪些具体类型名，违反 [依赖倒置](/cs-fundamentals/design-patterns#设计原则)（依赖抽象，而非具体实现）。
-3. **扩展成本高**：加一个新套装 = 在多处复制粘贴一组构造逻辑；改套装内任一产品的构造方式，所有创建点都可能要动。
-4. **切换整套实现困难**：从国内版切到跨境版，理论上应「一键换族」；分散的 `new` 让切换变成全局搜索替换。
-
-本质矛盾是：业务只关心「拿来用一整套」，却不得不同时维护 **「族内有哪些产品、怎么配对」** 的细节。
 
 ## 意图
 
 用一句话说：**提供一个创建一系列相关或相互依赖对象的接口，而无需指定它们具体的类。**
 
-业务依赖各产品的 **抽象接口**（`PaymentProcessor`、`ReceiptLogger`、`InvoiceTemplate`）；具体造哪一族、族内每个产品怎么造，由 **抽象工厂** 在组装阶段统一提供。切换套装时，只换工厂实现，业务代码不动。
-
-GoF 从 **实现结构** 角度的定义是：
-
-> 提供一个创建一系列相关或相互依赖对象的接口，而无需指定它们具体的类。
-
-与工厂方法的关系：
-
-| | 工厂方法 | 抽象工厂 |
-| :--- | :--- | :--- |
-| 创建什么 | **一种** 产品（如 `PaymentProcessor`） | **一族** 相关产品（`PaymentProcessor` + `ReceiptLogger` + `InvoiceTemplate`） |
-| 核心抽象 | 单个产品的创建方法（`NewXxx()`） | 一族产品的组合（如 `CheckoutSuite`） |
-| 典型动机 | 解耦「造哪一种支付渠道」 | 保证「整套支付渠道、日志、订单模板」风格一致 |
-
-> **命名说明**
->
-> - **工厂方法**（上一篇）：每种产品一个 `NewXxx()`，选型在组装层。
-> - **抽象工厂**（本文）：把一族相关产品 **成套** 创建并绑定在一起；Go 里常用一个 struct 装三个产品接口，不必硬套 `CreateXxx()` 工厂接口。
+结算业务只关心「渲染模板 → 扣款 → 写回执」这三步，不必知道国内版用的是支付宝还是跨境版用的是信用卡，更不必在业务里分别创建支付、日志、模板三个组件。**哪一套、族内怎么配对**，在程序 **启动时**（也叫 **组装** 阶段）一次性配好，再整包交给业务使用。
 
 ## 解决方案
 
@@ -161,9 +130,7 @@ func NewCrossBorderCheckoutSuite() CheckoutSuite {
 }
 ```
 
-这就是 Go 里的「抽象工厂」：`CheckoutSuite` 是 **一族产品的抽象容器**，`NewDomesticCheckoutSuite()` 是 **具体工厂**（在组装层决定注入哪些实现）。不必为每套装再写一个 struct 去实现 `CreatePaymentProcessor()` 等方法——**差异就在字段里放了什么接口**，而不是多一层工厂 interface。
-
-> 读 Java 资料时会看到 `AbstractFactory` 接口 + `CreateXxx()` 方法；那是 OOP 语言的惯用写法。Go 里若组装时就把产品造好、之后一直复用，**struct + 三个 interface 字段** 通常更直白。只有需要 **延迟创建** 或 **每次调用都造新实例** 时，才值得再包一层 `CreateXxx()` 工厂接口——见下文 [组装实践 · 按需创建](#按需创建)。
+这就是 Go 里的「抽象工厂」：`CheckoutSuite` 是 **一族产品的抽象容器**，`NewDomesticCheckoutSuite()` 是 **具体工厂**（在组装层决定注入哪些实现）。
 
 ### 使用者
 
@@ -190,32 +157,8 @@ func (s *Service) Checkout(order Order) error {
 
 ```go
 domesticSvc := NewService(NewDomesticCheckoutSuite())
-cross_borderSvc     := NewService(NewCrossBorderCheckoutSuite())
+cross_borderSvc := NewService(NewCrossBorderCheckoutSuite())
 ```
-
-与分散 `new` 对比：
-
-| | 分散创建 | 抽象工厂 |
-| :--- | :--- | :--- |
-| 族内一致性 | 靠人工保证三行 `new` 配对 | 组装函数内封装三个字段，不会混搭 |
-| 切换套装 | 改多处构造代码 | 组装处换 `NewDomesticCheckoutSuite()` → `NewCrossBorderCheckoutSuite()` |
-| 新增微信支付套装 | 多处加分支 | 新增 `NewWeChatCheckoutSuite()` 组装函数即可 |
-| 业务代码 | 知道所有具体类型名 | 只依赖 `PaymentProcessor` 等接口和 `CheckoutSuite` |
-
-新增套装时，只扩展、不改已有代码：
-
-```go
-func NewWeChatCheckoutSuite() CheckoutSuite {
-    return CheckoutSuite{
-        PaymentProcessor: &WeChatPayProcessor{},
-        ReceiptLogger:   &AuditReceiptLogger{},       // 可与国内版共用审计
-        InvoiceTemplate: &VATInvoiceTemplate{},
-    }
-}
-
-wechatSvc := NewService(NewWeChatCheckoutSuite())
-```
-
 
 ## 适用场景
 
@@ -245,110 +188,14 @@ wechatSvc := NewService(NewWeChatCheckoutSuite())
 
 最后一点值得单独说明：GoF 原文也指出，抽象工厂最大的麻烦是 **向套装体系新增一种产品类型**（例如给所有套装都加 `Metrics` 字段）——这比新增一个 **新套装** 更痛，因为要动 struct 和所有组装函数。若产品种类经常变、套装相对稳定，要权衡是否值得。
 
-## 组装实践
+## 关联
 
-> **阅读提示**：先掌握「在 `main` 里选 `NewXxxSuite()` 并 `NewService(suite)`」即可。本节是常见变体；初学可先跳过。
-
-### 按配置选择套装
-
-与工厂方法篇类似，`switch` 可以留在组装层，不应进入 `Service.Checkout`：
-
-```go
-func NewServiceFromConfig(cfg Config) (*Service, error) {
-    var suite CheckoutSuite
-    switch cfg.Suite {
-    case "domestic":
-        suite = NewDomesticCheckoutSuite()
-    case "cross_border":
-        suite = NewCrossBorderCheckoutSuite()
-    default:
-        return nil, fmt.Errorf("unknown suite: %q", cfg.Suite)
-    }
-    return NewService(suite), nil
-}
-```
-
-这里的 `switch` 选的是 **整族**，不是族内的单个产品——族内配对仍由 `NewXxxSuite()` 保证。
-
-### 与工厂方法的组合
-
-组装函数里可以调用各产品的 `NewXxx()` 构造函数，不必直接 `&AlipayProcessor{}`——复杂构造留在工厂方法里，成套选型留在组装函数里：
-
-```go
-func NewDomesticCheckoutSuite() CheckoutSuite {
-    return CheckoutSuite{
-        PaymentProcessor: NewAlipayProcessor(loadAlipayConfig()),
-        ReceiptLogger:   NewAuditReceiptLogger(),
-        InvoiceTemplate: NewVATInvoiceTemplate(),
-    }
-}
-```
-
-### 按需创建
-
-上文 `CheckoutSuite` 在组装时就把三个产品造好、之后复用。若每次 `Checkout` 都需要 **新实例**（带请求上下文、超时设置等），可以再包一层带 `CreateXxx()` 的工厂接口——这时才值得用 factory interface，而不是 struct 里直接放产品：
-
-```go
-type CheckoutSuiteFactory interface {
-    CreatePaymentProcessor() PaymentProcessor
-    CreateReceiptLogger() ReceiptLogger
-    CreateInvoiceTemplate() InvoiceTemplate
-}
-
-type suiteFactory struct {
-    newPaymentProcessor func() PaymentProcessor
-    newReceiptLogger   func() ReceiptLogger
-    newInvoiceTemplate func() InvoiceTemplate
-}
-
-func (f suiteFactory) CreatePaymentProcessor() PaymentProcessor { return f.newPaymentProcessor() }
-func (f suiteFactory) CreateReceiptLogger() ReceiptLogger     { return f.newReceiptLogger() }
-func (f suiteFactory) CreateInvoiceTemplate() InvoiceTemplate  { return f.newInvoiceTemplate() }
-
-func NewDomesticCheckoutSuiteFactory() CheckoutSuiteFactory {
-    return suiteFactory{
-        newPaymentProcessor: NewAlipayProcessor,
-        newReceiptLogger:   NewAuditReceiptLogger,
-        newInvoiceTemplate: NewVATInvoiceTemplate,
-    }
-}
-
-type CheckoutService struct {
-    factory CheckoutSuiteFactory
-}
-
-func (s *CheckoutService) Checkout(order Order) error {
-    processor := s.factory.CreatePaymentProcessor()
-    logger := s.factory.CreateReceiptLogger()
-    invoiceTpl := s.factory.CreateInvoiceTemplate()
-    body := invoiceTpl.Render(order)
-    processor.Pay(order)
-    logger.Record("checkout", body)
-    return nil
-}
-```
-
-两种写法对比：
-
-| | 套装 struct（本文主路径） | `CreateXxx()` 工厂接口 |
-| :--- | :--- | :--- |
-| 容器里放什么 | 三个 **产品接口** | 三个 **构造函数** |
-| 何时创建 | 组装时一次 | 每次 `Checkout` 可调 `Create` |
-| 适用 | 产品无状态、可复用 | 每次需要新实例 |
-| 更接近 GoF | 概念上等价，Go 里更直白 | 与 Java 资料写法一致 |
-
-多数无状态场景用套装 struct 即可；只有确实需要按需创建时，再引入 `CreateXxx()` 那一层。
-
-## 小结
-
-记住这四点即可：
-
-1. **一族产品绑在一起**：`CheckoutSuite` 里 `PaymentProcessor` + `ReceiptLogger` + `InvoiceTemplate` 成套注入，避免混搭。
-2. **业务只依赖接口**：`Service` 不出现具体类型名，切换套装只换 `NewXxxSuite()`。
-3. **不必硬套 factory interface**：组装时造好、之后复用 → struct 里放三个产品接口；按需创建 → 再用 `CreateXxx()`。
-4. **新增产品种类要动全体套装**：这是主要代价；产品种类稳定、套装常增时更合适。
-
-上一篇的工厂方法管 **一种** 产品；本篇的抽象工厂管 **一套** 产品。先判断有没有「族」和「配套」需求，再决定用哪一个。若套装已经选好，但单条订单本身字段很多、可选项很多，则进入下一篇 [生成器模式](/cs-fundamentals/design-patterns/builder)：它关心的是 **如何把一条具体订单构建完整**。
+- 许多设计在初期会先用 [工厂方法模式](/cs-fundamentals/design-patterns/factory)（较简单，也便于通过子类定制），随后再演化为 [抽象工厂模式](/cs-fundamentals/design-patterns/abstract-factory)、[原型模式](/cs-fundamentals/design-patterns/prototype) 或 [生成器模式](/cs-fundamentals/design-patterns/builder)（更灵活，也更复杂）。
+- [生成器模式](/cs-fundamentals/design-patterns/builder) 重点关注如何 **分步** 生成复杂对象；抽象工厂专门用于生产 **一系列相关对象**。抽象工厂会马上返回产品，生成器则允许你在获取产品前执行一些额外构造步骤。
+- 抽象工厂模式通常基于一组工厂方法，但你也可以使用原型模式来生成这些产品。
+- 当只需对客户端代码 **隐藏子系统创建对象的方式** 时，你可以用抽象工厂来代替 [外观模式](/cs-fundamentals/design-patterns/facade)。
+- 你可以将抽象工厂和 [桥接模式](/cs-fundamentals/design-patterns/bridge) 搭配使用。若桥接定义的抽象只能与特定实现合作，抽象工厂可以封装这些配对关系，并对客户端隐藏其复杂性。
+- 抽象工厂、生成器和原型都可以用 [单例模式](/cs-fundamentals/design-patterns/singleton) 来实现。
 
 ## 参考阅读
 
