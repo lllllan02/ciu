@@ -355,12 +355,17 @@ Client 若 **只读结算**，仍依赖 `OrderLine`；编辑模块依赖 `Mutabl
 
 ### 与装饰器的区别
 
+两者都「持有同接口对象、往下委托」，容易看成同一种递归。差别在 **问的问题**：
+
 | | 组合 | 装饰器 |
 | :--- | :--- | :--- |
-| 关系 | **部分-整体**，子节点是 **内容** | **包装**，内外 **同一接口** |
-| 结构 | 树，一个 Composite 多个 child | 链，一层包一层 |
-| 目的 | 统一对待 **整棵明细** | **增强** 单行行为（折扣、日志） |
-| 例子 | 礼盒包含茶叶 + 零食包 | `DiscountLine{inner: ProductLine{...}}` 在 `Total()` 里打折 |
+| **问的是** | 这一行 **由哪些独立明细组成** | 这一行 **还是原来那行**，叠了哪些规则 |
+| **拓扑** | 树，1 → **N** 个兄弟 | 链，1 → **1** 个 inner |
+| **递归** | **汇总** peer：`sum += child.Total()` | **变换** spine：`transform(inner.Total())` |
+| **实体数** | 礼盒含茶 + 杯 = **2 件货** | 茶 + 券 + 包装 = **还是 1 行茶** |
+| **child 能否独立存在** | 能，每个 SKU 可单独下单 | 不能，`CouponLine` 离开 `inner` 无意义 |
+
+若把优惠券硬写成 bundle 的一个 child，计价也许能凑对，但列表、库存、满减分摊的语义都会错——优惠券不是一件商品。详见 [装饰器模式 · 装饰器像「只有一个子节点的 Bundle」吗？](/cs-fundamentals/design-patterns/decorator#装饰器像只有一个子节点的-bundle-吗)。
 
 可叠加：`BundleLine` 的 child 可以是 `DiscountLine{inner: ProductLine{...}}`，只要 `DiscountLine` 也实现 `OrderLine`。
 
@@ -419,11 +424,12 @@ func (b BundleLine) ReserveInventory() error {
 3. **与适配器、桥接正交**：组合管 **订单里有什么**；适配器管 **接口翻译**；桥接管 **两维独立变化**。
 4. **注意接口别无限变胖**：只读遍历用透明组合；操作暴增时拆接口或访问者。
 
-[桥接模式](/cs-fundamentals/design-patterns/bridge) 把 **支付请求形态与支付后端** 拆开；组合模式把 **订单明细的树形结构** 与 **结算/校验/库存** 的调用方式统一。放回电商订单系统这条主线：明细从扁平 SKU 长成嵌套套餐时，用组合让 `CheckoutService` 始终只面对 `OrderLine`。
+[桥接模式](/cs-fundamentals/design-patterns/bridge) 把 **支付请求形态与支付后端** 拆开；组合模式把 **订单明细的树形结构** 与 **结算/校验/库存** 的调用方式统一。放回电商订单系统这条主线：明细从扁平 SKU 长成嵌套套餐时，用组合让 `CheckoutService` 始终只面对 `OrderLine`。当同一行还要叠加会员价、优惠券、礼品包装等可选增强时，下一篇 [装饰器模式](/cs-fundamentals/design-patterns/decorator) 说明如何动态包装而不必穷举子类。
 
 ## 参考阅读
 
 - [x] [生成器模式](/cs-fundamentals/design-patterns/builder) — 分步构建订单，可与 Composite 组装明细树
 - [x] [桥接模式](/cs-fundamentals/design-patterns/bridge) — 支付维度拆分，与明细树结构正交
+- [x] [装饰器模式](/cs-fundamentals/design-patterns/decorator) — 单行可选增强，可与 Composite 子节点叠加
 - [x] [Refactoring.Guru - 组合模式](https://refactoringguru.cn/design-patterns/composite) (2026-06-22)
 - [x] [菜鸟教程 - 组合模式](https://www.runoob.com/design-pattern/composite-pattern.html) (2026-06-22)
