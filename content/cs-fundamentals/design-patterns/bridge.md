@@ -49,36 +49,76 @@ func checkout(kind, backend, orderID string, amount int64, vars map[string]strin
 
 ## 意图
 
-用 GoF 的术语，系统拆成 **抽象部分**（Abstraction）和 **实现部分**（Implementor）两层——这里的「抽象 / 实现」是 **模式里的角色划分**，**不是** 编程语言里的 `interface`、`abstract class`，也 **不是** 日常说的「越抽象越 vague」。**抽象部分 = 调用方看到、直接使用的那一层**；**实现部分 = 底层平台真正干活的那一层**。
+用一句话说：**把「对外的用法」和「底层的干法」拆成两层，各自独立扩展，再用组合把它们接在一起。**
 
-用更通俗的话说：**「调用方怎么提交、提交之前要做什么处理」是一回事，「最后经哪条路、用什么协议送出去」是另一回事**——两件事都会变，但应该分开设计，组装时再把它们 **配在一起**。
+### 先别被名字吓到
 
-落到电商订单系统：
+GoF 把这两层叫 **抽象部分**（Abstraction）和 **实现部分**（Implementor）。这里的「抽象 / 实现」**不是** 编程语言里的 `interface`、`abstract class`，也 **不是** 日常说的「越抽象越 vague、说不清楚」——它只是 **模式里的两个角色名**。
 
-- **抽象部分**：**业务侧的提交 API**——`CheckoutAPI` 提供 `Checkout(orderID, request)`，`InstallmentCheckoutAPI` 提供 `CheckoutWithVars(orderID, vars)` 并在内部渲染订单模板。直接支付、套订单模板并不「抽象」，它们是 **同一「提交订单」能力下的不同入口**；这一层 **不管** 背后是 银行网关 还是 微信支付。
-- **实现部分**：**底层支付能力**——`PaymentBackend` 约定 `Charge(orderID, request)`，`AlipayBackend`、`WeChatPayBackend` 各自调 银行网关、微信支付网关。这一层 **不管** 订单明细是普通扣款还是分期请求。
+可以先这样记：
 
-抽象部分 **组合** 持有实现部分（Go 里通常是 struct 字段引用 `PaymentBackend`）。例如 `InstallmentCheckoutAPI.CheckoutWithVars` 先渲染订单模板，再调用 `backend.Charge(...)`。加退款入口只动抽象部分，接 PayPal 只动实现部分，不必为每种组合写 `AlipayRefundPaymentProcessor` 这类类。
+| 模式里的叫法 | 实际是什么 | 打个比方 |
+| :--- | :--- | :--- |
+| **抽象部分** | 调用方直接用的那一层 | 收银台：负责「收什么款、怎么填单」 |
+| **实现部分** | 真正去扣款、调网关的那一层 | 支付通道：负责「走支付宝还是微信、怎么发请求」 |
 
-GoF 从 **实现结构** 角度的定义是：
+两层 **都会变**——以后可能加「退款入口」「PayPal 通道」——但 **不应该** 每加一种组合就写一个新类（上一节 `AlipayDirectPaymentProcessor`、`WeChatPayInstallmentPaymentProcessor` 那种）。
+
+### 电商订单里谁管什么
+
+继续用本文的订单支付例子，把两件事 **分开设计**：
+
+**抽象部分（对调用方可见）**
+
+- **管**：调用方怎么提交——直接支付、分期支付、退款；提交前要不要再套一层订单模板
+- **不管**：最后走支付宝还是微信
+
+例如：`CheckoutAPI` 负责普通提交，`InstallmentCheckoutAPI` 负责先渲染分期模板再提交。它们都是「提交订单」的不同入口，**不是**「越写越模糊的意思」。
+
+**实现部分（底层真正干活）**
+
+- **管**：调哪个支付网关、怎么扣款
+- **不管**：调用方是普通提交还是分期提交
+
+例如：`AlipayBackend`、`WeChatPayBackend` 各自对接银行网关、微信网关。
+
+**怎么接在一起**
+
+抽象部分 **组合持有** 实现部分——Go 里通常是 struct 里放 `PaymentBackend` 字段。一次分期支付的调用链大致是：
+
+```
+InstallmentCheckoutAPI 先渲染订单模板
+    → 再调用 CheckoutAPI
+    → 再调用 backend.Charge(...)
+    → 底层支付宝 / 微信真正扣款
+```
+
+这样一来：
+
+- 加 **退款入口** → 只动抽象部分（例如新增 `RefundCheckoutAPI`）
+- 接 **PayPal** → 只动实现部分（新增 `PayPalBackend`）
+- **不必** 再写 `AlipayRefundPaymentProcessor`、`WeChatPayRefundPaymentProcessor` 这类组合类
+
+GoF 从 **结构** 角度的定义：
 
 > 将抽象部分与它的实现部分分离，使它们都可以独立地变化。
 
-与 [适配器模式](/cs-fundamentals/design-patterns/adapter) 的关系：
+### 和适配器模式有啥不同
+
+两者结构上都像「A 持有 B」，但 **动机不同**：
 
 | | 桥接 | 适配器 |
 | :--- | :--- | :--- |
-| 动机 | **设计阶段** 拆清两个变化维度 | **集成阶段** 接口已存在且不兼容 |
-| 结构 | 抽象 **HAS-A** 实现接口 | 适配器 **HAS-A** 被适配者 |
-| 典型时机 | 预知「形态 × 支付后端」都会变 | 第三方/遗留 API 对不上 `PaymentProcessor` |
-| 是否改 Adaptee | 实现层通常 **自研**，随设计演进 | 往往 **不改** 第三方代码 |
+| **你在解决什么问题** | 设计时就知道有两个方向都会变，**主动拆开** | 已有接口对不上，**事后翻译成** 能用的接口 |
+| **典型场景** | 「提交方式 × 支付后端」都会不断增加 | 第三方 SDK 的方法名、参数和自家 `PaymentProcessor` 不一致 |
+| **会不会改第三方代码** | 实现层通常是你自己写的，随设计演进 | 往往 **不动** 第三方，只在外面包一层 |
 
-二者可 **组合**：`AlipayBackend` 内部用 [适配器](/cs-fundamentals/design-patterns/adapter) 包装 `LegacyBankClient`；`InstallmentCheckoutAPI` 可桥接在任意 `PaymentBackend` 上。
+两者还 **可以一起用**：`AlipayBackend` 内部用 [适配器](/cs-fundamentals/design-patterns/adapter) 包装 `LegacyBankClient`；`InstallmentCheckoutAPI` 在组装时桥接任意一个 `PaymentBackend`。
 
 > **命名说明**
 >
-> - **桥接 vs 策略（Strategy）**：策略常替换 **单一算法/行为**；桥接强调 **整层实现**（支付后端、渲染后端、存储引擎）与 **抽象层** 分离，两侧都可能有自己的子类层次。见下文 [组装实践 · 与策略的区别](#与策略的区别)。
-> - **桥接 vs 适配器**：结构都是「A 持有 B」——看 **动机**：是为 **独立扩展两个维度**，还是为 **兼容已有接口**。
+> - **桥接 vs 策略**：策略一般是「同一种事，换一种算法」；桥接是「整层实现（支付后端、渲染引擎）和整层用法（提交 API）分开，**两侧都可能各自长出一族类型**」。详见后文 [组装实践 · 与策略的区别](#与策略的区别)。
+> - **桥接 vs 适配器**：长得像（都是 A 持有 B），区别在于 **你是为两个变化维度做设计（桥接），还是为兼容旧接口做翻译（适配器）**。
 
 ## 解决方案
 
