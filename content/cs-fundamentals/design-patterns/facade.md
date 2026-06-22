@@ -522,12 +522,13 @@ var _ OrderCheckout = CheckoutFacade{}
 3. **外观要薄**：领域规则在子系统；Facade 管 **协作顺序**，别变上帝类。
 4. **别与适配器混淆**：适配器 **翻译一个** 接口；外观 **聚合多个** 子系统成 **一个** 用例入口。
 
-[装饰器模式](/cs-fundamentals/design-patterns/decorator) 统一了 **单行上的可选增强**；外观模式统一了 **下单用例的编排写在哪**。放回电商订单系统：明细结构与计价增强就绪后，**同一段**「预占 → 支付 → 落库 → 补偿」不必在 HTTP、后台、重试 worker 里各抄一遍——放进 `CheckoutFacade`，上层只调 `PlaceOrder`。
+[装饰器模式](/cs-fundamentals/design-patterns/decorator) 统一了 **单行上的可选增强**；外观模式统一了 **下单用例的编排写在哪**。放回电商订单系统：明细结构与计价增强就绪后，**同一段**「预占 → 支付 → 落库 → 补偿」不必在 HTTP、后台、重试 worker 里各抄一遍——放进 `CheckoutFacade`，上层只调 `PlaceOrder`。当批量导出或对账时 **同一 SKU 元数据在内存中重复出现**，下一篇 [享元模式](/cs-fundamentals/design-patterns/flyweight) 说明如何分离内部状态与外部状态并按 SKU 共享。
 
 ## 参考阅读
 
 - [x] [适配器模式](/cs-fundamentals/design-patterns/adapter) — 与外观的动机对比；子系统内常用适配器接第三方
 - [x] [组合模式](/cs-fundamentals/design-patterns/composite) — 明细树；Facade 委托 `lines` 给子系统遍历
 - [x] [装饰器模式](/cs-fundamentals/design-patterns/decorator) — 行级增强；与 Facade 正交
+- [x] [享元模式](/cs-fundamentals/design-patterns/flyweight) — SKU 元数据共享；与 Facade 正交
 - [x] [Refactoring.Guru - 外观模式](https://refactoringguru.cn/design-patterns/facade) (2026-06-22)
 - [x] [菜鸟教程 - 外观模式](https://www.runoob.com/design-pattern/facade-pattern.html) (2026-06-22)
