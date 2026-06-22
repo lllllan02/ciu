@@ -422,7 +422,7 @@ tmpl := NewInstallmentCheckoutAPI(sharedWeChatPay, cfg.AlertTemplate)
 3. **组装层做笛卡尔积**：`NewInstallmentCheckoutAPI(WeChatPayBackend{...}, tmpl)`，不必写 `WeChatPayInstallmentPaymentProcessor`。
 4. **别与适配器、策略混淆**：桥接是 **设计上的分层**；适配器是 **集成时的翻译**；策略是 **单一行为替换**。
 
-[适配器模式](/cs-fundamentals/design-patterns/adapter) 把 **现成的、接口不合** 的组件接进抽象；桥接则在 **设计之初** 就把 **会独立演化的两层** 拆开。放回电商订单系统这条主线：适配器解决「外部支付后端怎么接进来」，桥接解决「支付请求形态与支付后端如何避免组合爆炸」。
+[适配器模式](/cs-fundamentals/design-patterns/adapter) 把 **现成的、接口不合** 的组件接进抽象；桥接则在 **设计之初** 就把 **会独立演化的两层** 拆开。放回电商订单系统这条主线：适配器解决「外部支付后端怎么接进来」，桥接解决「支付请求形态与支付后端如何避免组合爆炸」。当订单明细从扁平 SKU 长成嵌套套餐、礼盒时，下一篇 [组合模式](/cs-fundamentals/design-patterns/composite) 解决「如何让结算与库存对整棵明细树使用同一套接口」。
 
 ## 参考阅读
 
