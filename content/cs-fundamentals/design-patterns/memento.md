@@ -3,11 +3,7 @@ title: 备忘录模式
 order: 17
 ---
 
-**备忘录模式**（Memento）在不 **破坏封装** 的前提下，把 **发起人（Originator）的内部状态** 抓取到 **备忘录（Memento）** 里 **外部保存**，并在需要时 **原样恢复**——**保管者（Caretaker）** 只 **存取 opaque 快照**，**不能也不应** 读改订单明细、地址等私有字段；**只有 Originator** 知道如何从 Memento **写回** 自己。
-
-与 [命令模式](/cs-fundamentals/design-patterns/command) 的 **分工** 很常被问到：[命令](/cs-fundamentals/design-patterns/command) 的 Undo 通常保存 **「逆操作所需的最小数据」**（如 `oldQty`）；备忘录保存 **某一时刻的完整（或一致子集）状态快照**——适合 **多字段联动** 的编辑会话（改地址又改券又改明细后 **一键回到 10 分钟前的草稿**），或 **Undo 语义难用单步逆操作表达** 时。与 [原型模式](/cs-fundamentals/design-patterns/prototype) 也不同：原型 **复制出一个新对象**；备忘录 **为同一 Originator 存档**，恢复时 **覆盖当前状态** 而非 `Clone()` 出新实例。与 [中介者](/cs-fundamentals/design-patterns/mediator) 可配合：结算页 [中介者](/cs-fundamentals/design-patterns/mediator) 管 **联动**；备忘录管 **整页 CheckoutContext 的检查点**。
-
-下文继续用「电商订单系统」：[命令](/cs-fundamentals/design-patterns/command) 已支持 **单步** `AdjustQuantityCommand.Undo`；[中介者](/cs-fundamentals/design-patterns/mediator) 已协调结算页各面板。当 **运营编辑未支付订单** 要 **多步试改并回到任意检查点**、**代客下单草稿** 要 **自动存档 / 崩溃恢复**、或 **复杂 `OrderDraft` 含组合明细树** 且 **字段间有不变量**（改券影响行级分摊）时，若 Caretaker **直接序列化整个 struct** 或 **手写 map[string]any**，会出现 **封装泄漏、恢复漏字段、外部可篡改快照**——备忘录把 **快照的创建与还原** 收进 Originator，对外只暴露 **不可变 Memento 句柄**。
+**备忘录模式** 在 **不破坏封装** 的前提下 **捕获并外部保存** 对象状态，以便之后 **恢复到先前状态**——Caretaker 只存取 opaque 快照，Originator 负责创建与还原。
 
 ## 问题
 

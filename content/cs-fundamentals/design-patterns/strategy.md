@@ -3,11 +3,7 @@ title: 策略模式
 order: 20
 ---
 
-**策略模式**（Strategy）把 **一族可互换算法** 封装成 **独立策略类**，对外暴露 **统一接口**（如 `Calculate`）；**上下文（Context）** 持有 **当前策略** 并在运行时 **注入或切换**，把 **「算什么」** 与 **「怎么算」** 拆开——新增 **大促价、B2B 合约价、跨境含税** 时 **加新 Strategy**，不必改 `PricingEngine` 里 **`switch channel`**。
-
-与 [状态模式](/cs-fundamentals/design-patterns/state) 的 **分工** 很常被问到：策略是 **客户端或组装层主动选择** 算法（会员价 vs 标价），**选定后通常不自动迁移**；状态是 **对象生命周期内** 行为随 **待支付→已支付** **自动变**。与 [装饰器模式](/cs-fundamentals/design-patterns/decorator) 也不同：装饰器 **层层包装同一 `OrderLine`**（会员折 + 券 + 包装费 **可叠加**）；策略常在 **订单/运费/分摊** 层 **择一算法** 完成 **整段计算**——二者 **可组合**：`MemberPricingStrategy` 算完行价后，单行仍可用 [装饰器](/cs-fundamentals/design-patterns/decorator) 叠券。与 [桥接模式](/cs-fundamentals/design-patterns/bridge) 也不同：桥接 **固定拆两个独立变化维度**（支付形态 × 支付后端）；策略是 **单一维度上多种算法可替换**，不涉及 **抽象层与实现层长期结对**。
-
-下文继续用「电商订单系统」：[装饰器](/cs-fundamentals/design-patterns/decorator) 已支持 **行级** 增强；[状态](/cs-fundamentals/design-patterns/state) 已管 **订单生命周期**。当 **整单计价、运费、优惠券分摊** 随 **渠道 / 会员等级 / 大促 / B2B 合约** 切换 **不同规则**，且 `CheckoutService`、`ReportService` 各处 **`if user.VIP`** 时，若 **加「直播间专享价」** 要 **改五个 Service**，会出现 **规则重复、测试组合爆炸**——策略把 **每种计价规则** 收进 `StandardPricingStrategy`、`MemberPricingStrategy` 等，Context **`Calculate` 只委托 strategy**。
+**策略模式** 把 **一族可互换算法** 封装成 **独立策略**，Context **持有并委托** 当前策略——新增规则时 **加新 Strategy**，不必改 Context 里的分支逻辑。
 
 ## 问题
 

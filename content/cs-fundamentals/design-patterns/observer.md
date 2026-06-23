@@ -3,11 +3,7 @@ title: 观察者模式
 order: 18
 ---
 
-**观察者模式**（Observer）在 **主题（Subject）** 与 **多个观察者（Observer）** 之间建立 **一对多依赖**：主题 **状态或领域事实发生变化** 时，**自动通知** 所有已注册观察者——主题 **只负责发布**，不必认识 **短信、搜索索引、积分** 各自怎么实现，观察者 **只订阅感兴趣的事件**，不必 **反向依赖** `OrderService` 的写方法。
-
-与 [外观模式](/cs-fundamentals/design-patterns/facade) 的 **分工** 很常被问到：[外观](/cs-fundamentals/design-patterns/facade) **主动编排** 下单用例（预占 → 支付 → 落库）；观察者处理 **「事实已发生」之后的扇出**（`OrderPaid` → 发邮件、更新 ES、加积分）——Facade **同步、有顺序**；Observer **常异步、订阅者彼此独立**。与 [中介者模式](/cs-fundamentals/design-patterns/mediator) 也不同：中介 **协调对等同事的双向联动**（改地址 → 刷运费）；观察者 **主题单向广播**，观察者 **不应再指挥主题改状态**。与 [命令模式](/cs-fundamentals/design-patterns/command) 可配合：`PlaceOrder` 或 `AdjustQuantityCommand.Execute` **成功后** **再 `Publish(OrderPaid)`**——命令管 **写与 Undo**；观察者管 **只读/异步副作用**。
-
-下文继续用「电商订单系统」：[外观](/cs-fundamentals/design-patterns/facade) 已完成 `PlaceOrder`；[命令](/cs-fundamentals/design-patterns/command) 已支持运营改单。当 **订单支付、发货、取消** 后要 **通知用户、更新搜索、写审计、加会员积分、推 WMS**，且 **每加一种下游就要改 `OrderService`** 时，若写操作里 **硬编码** 六个 `if err := xxx.Notify()`，会出现 **开闭困难、测试要 mock 全家、同步路径变慢**——观察者把 **「订单状态变了」** 与 **「谁要响应」** 拆开，组装层 **注册 Observer**，主题 **只 Publish 领域事件**。
+**观察者模式** 在 **主题与多个观察者** 之间建立 **一对多依赖**：主题状态变更时 **自动通知** 所有已注册观察者——主题 **只负责发布**，不必认识每个下游实现。
 
 ## 问题
 

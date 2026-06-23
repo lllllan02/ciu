@@ -3,11 +3,7 @@ title: 访问者模式
 order: 22
 ---
 
-**访问者模式**（Visitor）把 **作用于对象结构各元素上的操作** 封装成 **独立访问者对象**：元素提供 **`Accept(visitor)`**，在内部 **回调** `visitor.VisitProduct(this)` / `VisitBundle(this)`——实现 **双重分派**，从而在 **不修改 `ProductLine`、`BundleLine` 类** 的前提下 **新增** 导出 JSON、拣货单、税务报表、审计日志等 **一类新操作**；**元素类相对稳定、操作种类持续增加** 时尤其合适。
-
-与 [组合模式](/cs-fundamentals/design-patterns/composite) 的 **分工** 很常被问到：[组合](/cs-fundamentals/design-patterns/composite) 让 **叶子与容器** 统一 `Total()`、`Validate()` 等 **内聚在节点上的核心行为**；访问者把 **读多写少、种类不断增的操作** 从 `OrderLine` 接口 **挪到 Visitor**——避免 **接口膨胀**。与 [迭代器模式](/cs-fundamentals/design-patterns/iterator) 也不同：迭代器管 **怎么遍历、逐个取元素**；访问者管 **遍历时对每种节点类型做什么**（双重分派到 `VisitProduct` vs `VisitBundle`）。与 [策略模式](/cs-fundamentals/design-patterns/strategy) 也不同：策略 **替换单一算法**；访问者是 **操作族 × 元素类型** 的 **矩阵**，每个 Visitor 是 **一整列操作**。
-
-下文继续用「电商订单系统」：[组合](/cs-fundamentals/design-patterns/composite) 已建 `ProductLine` / `BundleLine` 树；[迭代器](/cs-fundamentals/design-patterns/iterator) 已支持 **扁平扫叶子 SKU**。当 **对账导出 JSON、WMS 拣货、税务分类、合规审计** 都要 **区分单品与礼盒** 且 **各自递归规则不同**，若在 `OrderLine` 上 **不断加** `ExportJSON()`、`ToPickList()`、`TaxCategory()`，会出现 **接口臃肿、赠品行也要空实现、改报表改所有节点**——访问者让 **元素只保留 `Accept` + 核心领域方法**，**新报表 = 新 Visitor**。
+**访问者模式** 把 **作用于结构各元素上的操作** 封装成 **独立访问者**：元素通过 **`Accept(visitor)`** 回调对应 `Visit` 方法——**不修改元素类** 即可 **新增一整类操作**。
 
 ## 问题
 

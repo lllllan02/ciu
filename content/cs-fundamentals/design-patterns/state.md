@@ -3,11 +3,7 @@ title: 状态模式
 order: 19
 ---
 
-**状态模式**（State）把 **与状态相关的行为** 拆进 **独立的状态类**：**上下文（Context）** 持有当前 `State`，对外暴露 **统一操作**（`Pay`、`Ship`、`Cancel`、`Refund`），**委托** 给当前状态实现——状态 **允许则执行并可能切换到下一状态**，**不允许则返回明确错误**——从而消除 **`switch order.Status`** 散落各处，让 **「在此状态下能做什么」** 与 **「转换到何状态」**  **内聚在对应 State 类** 里。
-
-与 [策略模式](/cs-fundamentals/design-patterns/strategy) 的 **分工** 很常被问到：策略是 **客户端主动选择** 可互换算法（如会员价 vs 普通价），**选定后通常不变**；状态是 **对象随内部生命周期自动切换**（待支付 → 已支付 → 已发货），**同一方法**（`Cancel`）在 **不同状态有不同语义与结果**。与 [观察者模式](/cs-fundamentals/design-patterns/observer) 也不同：状态管 **能不能做、做完变什么状态**；观察者管 **变完之后通知谁**——`PaidState.Pay` 成功后 **`context.Publish(OrderPaid)`** 可组合。与 [命令模式](/cs-fundamentals/design-patterns/command) 也可配合：**能否 Execute** 由 State 校验；Command **Execute 成功** 后调 `context.Transition`。
-
-下文继续用「电商订单系统」：[观察者](/cs-fundamentals/design-patterns/observer) 已把 **支付后扇出** 从 `OrderService` 剥离。当 **订单生命周期** 变复杂（待支付、已支付、部分发货、已发货、已完成、已取消、退款中、已退款），且 **`Pay` / `Ship` / `Cancel` / `AdjustLines` / `Refund` 能否调用** 到处 **`if status == …`** 时，若 **运营改规则**（「已支付未发货可改地址」「跨境单取消要走审核」）要 **改十个 Service 方法**，会出现 **非法转换漏拦、行为不一致**——状态模式把 **每态行为** 收进 `PendingState`、`PaidState` 等，Context **只转发**。
+**状态模式** 把 **与状态相关的行为** 拆进 **独立状态类**：Context 持有当前 State 并 **委托** 操作——允许则执行并可能 **切换状态**，不允许则返回错误，从而消除 **`switch status`** 散落各处。
 
 ## 问题
 

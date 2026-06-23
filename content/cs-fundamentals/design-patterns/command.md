@@ -3,11 +3,7 @@ title: 命令模式
 order: 14
 ---
 
-**命令模式**（Command）把 **一次操作请求** 封装成 **独立对象**：对象里带上 **执行所需参数**，对外暴露统一的 `Execute`（以及可选的 `Undo`）；**调用方**（Invoker）只持有命令接口，不必知道 **具体改的是哪张表、调了哪个 Service 方法**——从而把 **「谁发起」** 与 **「谁干活」** 拆开，并天然支持 **排队、日志、撤销、重做与宏命令**。
-
-与 [责任链模式](/cs-fundamentals/design-patterns/chain-of-responsibility) 的 **分工** 很常被问到：责任链解决 **「请求沿链传递，由某一环处理」**；命令解决 **「把单次操作变成可存储、可调度、可回滚的一等公民」**——链上的每一环仍是 **当场执行** 的 Handler，命令则是 **延迟执行、可入队、可记入历史栈** 的请求对象。与 [外观模式](/cs-fundamentals/design-patterns/facade) 也不同：[外观](/cs-fundamentals/design-patterns/facade) 编排 **一整条用例**（`PlaceOrder`）；命令封装 **原子或组合后的单步操作**（`AdjustLineQuantity`、`CancelOrder`），便于 **撤销一步** 而不是回滚整条 Facade 流程。
-
-下文继续用「电商订单系统」：[外观](/cs-fundamentals/design-patterns/facade) 已提供下单编排；[责任链](/cs-fundamentals/design-patterns/chain-of-responsibility) 已处理下单前校验与退款审批。当 **运营后台** 要改地址、改数量并 **撤销**；**大促结束** 要 **批量关单** 且可 **重试**；**离线 App** 要把操作 **先入队、联网后再执行**；审计要求 **每条人工改动可回放** 时，若 Controller 直接调 `OrderService.UpdateAddress`，会出现 **无法 Undo、无法排队、调用方与领域方法紧耦合**——命令把 **操作本身** 对象化。
+**命令模式** 把 **操作请求** 封装成 **独立对象**，使 **调用方与接收者解耦**，并支持 **排队、日志、撤销与重做**。
 
 ## 问题
 

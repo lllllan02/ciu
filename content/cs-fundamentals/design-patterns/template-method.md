@@ -3,11 +3,7 @@ title: 模板方法模式
 order: 21
 ---
 
-**模板方法模式**（Template Method）在 **抽象模板** 里 **固定算法骨架**（步骤顺序、何时补偿），把 **各步骤中可变的部分** 延迟到 **子类或钩子（Hook）** 实现——子类 **不重写整条流程**，只 **覆写某几步**；模板方法 **Hollywood 原则**：「别找我们，我们找你」——**`PlaceOrder` 调你**，而不是子类 **自己拼顺序**。
-
-与 [外观模式](/cs-fundamentals/design-patterns/facade) 的 **分工** 很常被问到：[外观](/cs-fundamentals/design-patterns/facade) 面向 **外部客户端**，把 **多子系统** 收成 **`PlaceOrder` 一次调用**；模板方法面向 **同一用例的多种渠道变体**（App、B 端代客、跨境），**骨架相同、个别步骤不同**——Facade **可以内部使用** Template Method 组织 `AppCheckout` / `B2BCheckout`，对外仍是一个 Facade。与 [策略模式](/cs-fundamentals/design-patterns/strategy) 也不同：策略 **整段算法可替换**（会员价 vs 大促价）；模板方法 **步骤顺序不变**，只 **某步实现可换**（`collectPayment` 用信用额度 vs 在线支付）。与 [责任链](/cs-fundamentals/design-patterns/chain-of-responsibility) 也不同：责任链 **请求穿过多处理者、可短路**；模板 **固定步骤表**，钩子 **必在骨架位置上被调用**。
-
-下文继续用「电商订单系统」：[外观](/cs-fundamentals/design-patterns/facade) 已提供下单入口；[策略](/cs-fundamentals/design-patterns/strategy) 已封装计价算法；[责任链](/cs-fundamentals/design-patterns/chain-of-responsibility) 已做下单前校验。当 **App、B 端、跨境站** 都要 **预占→计价→支付→落库**，但 **前置校验、收款方式、下单后动作** 各不同，若在三个 Service 里 **各写一遍完整 PlaceOrder** 只改中间几行，会出现 **顺序不一致、补偿漏写、加一步要改三处**——模板方法把 **不变骨架** 收进 `PlaceOrderTemplate.PlaceOrder`，渠道 **只覆写 Hook**。
+**模板方法模式** 在 **抽象类** 中 **固定算法骨架**（步骤顺序），把 **可变步骤** 延迟到 **子类或钩子** 实现——子类 **只覆写某几步**，不重写整条流程。
 
 ## 问题
 

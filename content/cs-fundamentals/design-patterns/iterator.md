@@ -3,11 +3,7 @@ title: 迭代器模式
 order: 15
 ---
 
-**迭代器模式**（Iterator）把 **对集合元素的访问** 封装成 **独立对象**：客户端通过统一的 `Next` / `HasNext`（或 Go 的 `range` / `iter.Seq`） **逐个取元素**，而不必知道 **底层是切片、链表、树还是数据库游标**——从而把 **「怎么遍历」** 与 **「集合怎么存」** 拆开，并可在 **同一聚合** 上挂 **多种遍历策略**（全量、仅叶子 SKU、按状态过滤、逆序分页）。
-
-与 [组合模式](/cs-fundamentals/design-patterns/composite) 的 **分工** 很常被问到：[组合](/cs-fundamentals/design-patterns/composite) 解决 **「整棵明细树用同一接口递归操作」**（`Total()`、`Validate()`）；迭代器解决 **「按某种顺序、某种过滤规则 **逐个** 取出元素，且调用方不碰内部结构」**——导出拣货单要 **深度优先扫所有叶子 SKU**、对账报表要 **分页扫历史订单**、退款脚本要 **只遍历可退行**，若在每个 Service 里 **手写 `for` + `switch` + 递归**，会与 Composite 的遍历逻辑 **重复且难换存储**。与 [外观模式](/cs-fundamentals/design-patterns/facade) 也不同：[外观](/cs-fundamentals/design-patterns/facade) 提供 **用例级入口**（`PlaceOrder`）；迭代器提供 **对某一集合的访问协议**，常由 Facade **内部** 或 **报表 / 批处理 Client** 使用。与 [命令模式](/cs-fundamentals/design-patterns/command) 可配合：批处理 Worker **`for order := range orders.Iterator()`** 再 **`Enqueue(CancelOrderCommand)`**——迭代器管 **怎么拿下一个元素**，命令管 **拿到后做什么**。
-
-下文继续用「电商订单系统」：[组合](/cs-fundamentals/design-patterns/composite) 已把订单明细建成 `OrderLine` 树；[命令](/cs-fundamentals/design-patterns/command) 已支持批量关单入队。当 **仓储导出** 要 **扁平化所有叶子 SKU**、**运营报表** 要 **按状态分页扫订单**、**对账任务** 要 **游标式读明细而不一次加载百万行**、且 **存储从内存切片迁到 DB / ES** 时，若对外暴露 `[]OrderLine` 或 `[]Order`，会出现 **遍历算法散落、换存储要改所有调用方**——迭代器把 **遍历职责** 收到 Iterator 里，Aggregate 只承诺 **`Iterator()`**。
+**迭代器模式** 把 **对集合元素的访问** 封装成 **独立对象**，使客户端 **逐个取元素** 而不必暴露 **底层存储与遍历方式**。
 
 ## 问题
 
