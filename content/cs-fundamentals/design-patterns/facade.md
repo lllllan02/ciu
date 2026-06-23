@@ -19,77 +19,28 @@ order: 10
 
 ## 问题
 
-`CheckoutService` 已经能对着 `[]OrderLine` 调 `Validate`、`ReserveInventory`、`Total`。真实 **下单** 却远不止这些——还要调支付、持久化、消息、发票、合规审计等 **多个独立子系统**，且 **顺序与失败回滚** 有固定约定：
+下单远不止「算总价、扣库存」——还要调支付、落库、发通知、开发票、写审计，且 **顺序固定、失败要补偿**。最直接的做法是让 HTTP 控制器 **自己串联所有子系统**。
+
+入口少时还能应付；每多一个调用方（移动端、后台代客、定时任务），同一套编排就要 **复制一遍**：
+
+1. **与子系统紧耦合**：控制器直接依赖六七个类型，改一个子系统要改所有入口。
+2. **编排重复且易错**：预占 → 扣款 → 落库 → 失败回滚的顺序各写一遍，漏一步就超卖或重复扣款。
+3. **职责混杂**：HTTP 层本应管参数和响应，却承担 **分布式事务式编排**。
+4. **测试困难**：单测下单 happy path 必须 mock 全部依赖并断言调用顺序。
+
+本质矛盾是：**完成一次业务用例** 需要 **固定顺序的多步协作**，这段编排 **不应** 在每个客户端里各写一遍。典型写法如下：
 
 ```go
-type CheckoutController struct {
-    inventory   InventoryService
-    pricing     PricingEngine
-    payment     PaymentProcessor
-    orders      OrderRepository
-    notify      NotificationService
-    invoice     InvoiceService
-    audit       AuditService
-}
-
 func (c *CheckoutController) PlaceOrder(ctx context.Context, req PlaceOrderRequest) error {
-    for _, line := range req.Lines {
-        if err := line.Validate(); err != nil {
-            return err
-        }
-    }
-    for _, line := range req.Lines {
-        if err := line.ReserveInventory(); err != nil {
-            return err // 前面已预占的要手动 Release？控制器里写补偿？
-        }
-    }
-    amount := c.pricing.Total(req.Lines)
-    orderID := c.orders.NextID()
-    if err := c.payment.Pay(Order{ID: orderID, Amount: amount}); err != nil {
-        c.inventory.ReleaseAll(req.Lines) // 补偿逻辑重复出现在每个入口
+    // 校验 → 预占 → 计价 → 扣款 → 落库 → 通知 → 发票 → 审计
+    // 支付失败要 Release，落库失败要 Refund——补偿逻辑散落在此
+    if err := c.payment.Pay(...); err != nil {
+        c.inventory.ReleaseAll(req.Lines)
         return err
     }
-    if err := c.orders.Save(ctx, orderID, req); err != nil {
-        // 已扣款未落库——又要一套补偿
-        return err
-    }
-    _ = c.notify.SendOrderConfirmation(orderID)
-    _ = c.invoice.Issue(orderID)
-    _ = c.audit.Log("order.placed", orderID)
-    return nil
+    // …
 }
 ```
-
-移动端 API、后台代客下单、定时重试任务 **复制同一套编排**；每加一个子系统（如风控 `RiskService`），每个入口都要改：
-
-1. **客户端与子系统紧耦合**：控制器直接依赖 6+ 类型，违反 [迪米特法则](/cs-fundamentals/design-patterns#设计原则)——「最少知识」要求只与直接朋友通信，而不是跨层知道库存怎么 Release、发票怎么 Issue。
-2. **编排逻辑重复且易错**：预占 → 扣款 → 落库 → 失败回滚的顺序在 HTTP、MQ 消费者、脚本里各写一遍，漏一步或顺序错就产生 **超卖、重复扣款、孤儿订单**。
-3. **违反单一职责**：控制器本应管 **HTTP 参数与响应**，却承担 **分布式事务式编排**；改支付失败策略要改所有入口。
-4. **测试困难**：单测「下单 happy path」必须 mock 六个依赖并断言调用顺序；集成测试无法只替换「下单用例」而不碰子系统细节。
-5. **与适配器 / 桥接 / 组合 / 装饰的分工错位**：接口已接好、支付维度已拆开、明细树与行级增强也统一了——问题出在 **多个子系统如何被上层一次性使用**，而不是单个接口或单棵树的结构。
-
-本质矛盾是：**子系统职责清晰、各自可测**，但 **完成一次业务用例** 需要 **固定顺序的多步协作**——这段 **用例级编排** 必须存在于某处，却 **不应** 在每个客户端里各写一遍，也不该让 HTTP 层直接认识六个 package。
-
-### 外观到底在解决什么
-
-教材三条与本文例子的 **一一对应**：
-
-| 教材表述 | 在电商例子里具体指什么 |
-| :--- | :--- |
-| **降低耦合** | `CheckoutController` 从依赖 6 个类型 → 只依赖 `CheckoutFacade` |
-| **简化操作** | 客户端从「学会整条下单流水线」→ 只调 `PlaceOrder(req)` |
-| **隐藏细节** | 客户端 **不知道** 是先 `Reserve` 再 `Pay`，还是支付失败要 `Release`；这些 **协作细节** 封在 Facade 内 |
-
-读「问题」里的 `CheckoutController` 和后面「解决方案」里的 `CheckoutFacade`，**步骤几乎一样**——这 **不是矛盾**，而是说明：**被隐藏 / 被集中的是「客户端视角下的复杂使用方式」**；**实现层面** 的编排代码仍要有人写，只是 **写在一处、由 Facade 承担**，不再摊在每个客户端上。
-
-| 外观 **不** 消除 | 外观 **在** 消除（对客户端而言） |
-| :--- | :--- |
-| 编排逻辑本身（补偿、顺序仍要在 Facade 里写） | 每个客户端 **重复** 同一套编排（DRY） |
-| 子系统内部的领域规则（仍在 `PricingEngine` 等） | 客户端对 **多个子系统** 的直接依赖（耦合） |
-| 分布式一致性（Facade ≠ 分布式事务） | 客户端要 **记住的调用步骤**（简化操作） |
-| 单步算法难度 | 客户端 **可见的** 子系统协作结构（隐藏细节） |
-
-若 **只有一个调用方**，Facade 仍满足上表右侧前三行（耦合、操作、细节）——只是 **DRY 那一行** 不明显；见后文 [适用场景](#适用场景) 的「不必强行使用」。
 
 ## 意图
 

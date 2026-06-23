@@ -11,65 +11,25 @@ order: 12
 
 ## 问题
 
-`OrderService` 已能按 id 查订单、调 [外观](/cs-fundamentals/design-patterns/facade) 下单。运营后台、移动端、对账 Worker **都依赖** `OrderRepository` 接口。真实实现 `SQLOrderRepository` **直连 DB**，还暴露了 **远程库存预检** 的 gRPC 客户端——调用方越来越多：
+运营后台、移动端、对账 Worker 都依赖 `OrderRepository` 查订单。真实实现 **直连数据库**，但调用方越来越多，各自 **裸调** 真实对象——没有懒加载、没有鉴权、没有缓存。
+
+调用点少时还能应付；订单体量变大后，问题就会一起暴露：
+
+1. **加载过重**：列表页只要订单摘要，`GetOrder` 却 **总是** 拉全量明细——DB 和堆压力随 QPS 涨。
+2. **鉴权散落**：Admin、客服、买家三个入口各写一遍「是否本人 / 是否有权限」，漏一处就 **越权读单**。
+3. **远程细节泄漏**：超时、重试、连接池摊在每个 Handler 里，改 gRPC 地址要改 N 处。
+4. **缓存不一致**：有的入口缓存库存预检 5 秒、有的不缓存——超卖和脏读各算各的。
+
+本质矛盾是：**主题接口稳定**，但 **何时加载、谁有权访问、是否走缓存** 应在 **一处** 统一控制，却 **不应** 写进 SQL 实现，也不该在每个 Controller 复制。典型写法如下：
 
 ```go
-type OrderRepository interface {
-    GetOrder(ctx context.Context, orderID string) (*Order, error)
-    ListLines(ctx context.Context, orderID string) ([]OrderLine, error)
-    Save(ctx context.Context, order *Order) error
-}
-
 func (h *AdminHandler) ShowOrder(w http.ResponseWriter, r *http.Request) {
     orderID := r.URL.Query().Get("id")
-    // 无鉴权：任意登录用户可猜 ID 查看他人订单
-    order, err := h.repo.GetOrder(r.Context(), orderID)
-    if err != nil { /* … */ }
-    // GetOrder 内部 JOIN 10 万行明细——列表页其实只要 header
-    _ = json.NewEncoder(w).Encode(order)
-}
-
-func (h *OrderListHandler) ListSummaries(w http.ResponseWriter, r *http.Request) {
-    for _, id := range fetchOrderIDs() {
-        order, _ := h.repo.GetOrder(r.Context(), id) // 每条都拉全量 Lines
-        summaries = append(summaries, order.Summary())
-    }
+    // 无鉴权；GetOrder 内部 JOIN 10 万行明细——列表页其实只要 header
+    order, _ := h.repo.GetOrder(r.Context(), orderID)
+    json.NewEncoder(w).Encode(order)
 }
 ```
-
-库存侧，`InventoryService` 在 **另一个可用区**，每次 `Reserve` 都走网络；大促同一 SKU 被 **重复预检** 却没有统一缓存层：
-
-```go
-func (s *CheckoutService) PlaceOrder(ctx context.Context, req PlaceOrderRequest) error {
-    for _, line := range req.Lines {
-        // 每个入口自己 dial、自己超时、自己重试
-        if err := s.inventory.CheckStock(ctx, line.SKU, line.Quantity); err != nil {
-            return err
-        }
-    }
-    return s.repo.Save(ctx, buildOrder(req))
-}
-```
-
-1. **eager 加载过重**：列表页、消息通知只要 `order_id + amount + status`，`GetOrder` 却 **总是** 加载全部 `Lines` 与 [享元](/cs-fundamentals/design-patterns/flyweight) 解析——DB 与堆压力随 QPS 线性涨。
-2. **访问控制散落**：Admin、客服、买家 **三个入口** 各写一遍「是否本人 / 是否有 role」；漏一处即 **越权读单**。
-3. **远程调用细节泄漏**：超时、重试、熔断、连接池 **摊在每个 Handler**；改 gRPC 地址要改 N 处。
-4. **缓存策略重复且不一致**：对 `CheckStock` 有的入口缓存 5s、有的不缓存——超卖与 stale 读 **各算各的**。
-5. **与装饰器 / 外观的分工错位**：[装饰器](/cs-fundamentals/design-patterns/decorator) 解决 **行级计价增强**；[外观](/cs-fundamentals/design-patterns/facade) 解决 **多子系统编排**——这里要解决的是 **「访问 OrderRepository / InventoryService 这一资源本身」的控制**，不是改 `Total()` 也不是把支付+库存+落库串起来。
-
-本质矛盾是：**主题接口稳定**（`GetOrder`、`CheckStock`），但 **触达主题的方式**（何时加载、谁有权、走本地还是远程、是否读缓存）应在 **一处** 统一，却 **不应** 写进 `SQLOrderRepository` 的业务 SQL 里，也不该在每个 Controller 复制。
-
-### 常见代理变体（动机对照）
-
-| 类型 | 控制什么 | 电商例子 |
-| :--- | :--- | :--- |
-| **虚拟代理**（Virtual） | **延迟创建 / 加载** 开销大的主题 | `GetOrder` 只返 header；首次 `Lines()` 再查 DB |
-| **保护代理**（Protection） | **访问权限** | 非本人且非 `admin` → `ErrForbidden`，不触 DB |
-| **远程代理**（Remote） | **本地代表远程对象** | `InventoryServiceProxy` 封装 gRPC + 超时重试 |
-| **缓存代理**（Caching） | **缓存昂贵读** | `CheckStock` 结果按 `(sku, qty)` 短 TTL 缓存 |
-| **智能引用**（Smart Reference） | 引用计数、写时复制、失效通知 | 订单缓存 **写后** `Invalidate(orderID)` |
-
-同一 struct 可 **组合** 多种控制（如保护 + 虚拟）；文档里 **分节讲** 是为对照 GoF 分类，不是强制五种类。
 
 ## 意图
 

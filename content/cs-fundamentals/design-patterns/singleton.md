@@ -11,49 +11,28 @@ order: 5
 
 ## 问题
 
-业务里有些组件 **天然应是唯一的**：连接外部 API 的客户端、全局限流器、指标收集器、配置热加载器。最直接的做法是在用到的地方各自 `New`：
+有些组件 **天然在进程里只应有一份**：结算中心、连接池、全局限流器、指标收集器。最直接的做法是在每个用到的地方各自 `New` 一份。
+
+调用点少时看不出问题；入口一多，麻烦就会一起冒出来：
+
+1. **状态分裂**：限流器按实例各自计数，「全局每秒 1000 条」变成 N×1000，容易打爆下游。
+2. **资源浪费**：每个实例各持一套连接池，连接数和内存随调用点线性增长。
+3. **指标失真**：监控数据分散在多个实例里，看不到真实的结算量。
+4. **初始化重复**：支付客户端、TLS 握手、凭证加载在每条路径上重复执行。
+
+本质矛盾是：**系统语义上只需要一个协调者**，代码却允许 **随处 `New` 出多个**。典型写法如下：
 
 ```go
-type CheckoutHub struct {
-    alipay   PaymentProcessor
-    wechatPay     PaymentProcessor
-    creditCard    PaymentProcessor
-    limiter *RateLimiter // 全支付渠道共享配额
-    metrics *Metrics
+func submitOrder(...) error {
+    hub := NewCheckoutHub(...) // 各自 new 限流器、metrics
+    return hub.Checkout(...)
 }
 
-func NewCheckoutHub(alipay, wechatPay, creditCard PaymentProcessor) *CheckoutHub {
-    return &CheckoutHub{
-        alipay:   alipay,
-        wechatPay:     wechatPay,
-        creditCard:    creditCard,
-        limiter: NewRateLimiter(1000), // 每秒 1000 条
-        metrics: NewMetrics(),
-    }
-}
-
-func submitOrder(reg *OrderTemplateRegistry, buyer, orderID string) error {
-    hub := NewCheckoutHub(NewAlipayProcessor(), NewWeChatPayProcessor(), NewCreditCardProcessor())
-    // …Clone 订单模板、hub.Checkout(…)
-    return nil
-}
-
-func submitRefund(orderID string) error {
-    hub := NewCheckoutHub(NewAlipayProcessor(), NewWeChatPayProcessor(), NewCreditCardProcessor())
-    // 又一个 hub——限流与 metrics 互不共享
-    return nil
+func submitRefund(...) error {
+    hub := NewCheckoutHub(...) // 又一个 hub——配额与指标互不共享
+    return hub.Refund(...)
 }
 ```
-
-看起来每个函数都「自给自足」，但实例一多，问题就会暴露：
-
-1. **状态分裂**：`RateLimiter` 按 hub 实例各自计数，全局「每秒 1000 条」的配额被放大成 N×1000，容易打爆下游。
-2. **资源浪费**：每个 hub 持有独立的 支付网关 / HTTP 连接池，连接数与内存随调用点线性增长。
-3. **指标失真**：`Metrics` 分散在多个 hub 里，监控面板无法反映真实结算量。
-4. **初始化重复**：支付渠道客户端、TLS 握手、凭证加载在每条提交路径上重复执行，启动慢、I/O 浪费。
-5. **与 [单一职责](/cs-fundamentals/design-patterns#设计原则) 冲突**：业务函数既管「提交什么」，又管「怎么造全局枢纽」，创建逻辑散落各处。
-
-本质矛盾是：**系统语义上只需要一个协调者**，代码却允许 **随处 `New` 出多个「协调者」**。
 
 ## 意图
 

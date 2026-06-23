@@ -11,73 +11,26 @@ order: 15
 
 ## 问题
 
-明细树与订单列表开始被 **直接暴露内部结构**：
+仓储导出要 **扁平化所有叶子 SKU**，报表要 **按状态分页扫订单**，对账要 **游标式读明细而不一次加载百万行**——不同消费者需要 **不同顺序、不同过滤** 地访问同一批数据。
+
+最直接的做法是 **暴露内部结构**（`[]OrderLine`、`[]Order`），让调用方自己写 `for` 和递归。存储不变时还能应付；从内存切片迁到 DB 分页时，问题就会一起暴露：
+
+1. **遍历逻辑重复**：导出、对账、库存释放各自写递归，加一种明细类型要改 **每一处** walk。
+2. **与存储紧耦合**：报表直接 `orders[i]` 分页；换成 DB cursor 或 ES scroll 时，**所有** 调用方都要重写。
+3. **多种策略难并存**：同一棵树要「仅叶子」「含 bundle 节点」「跳过赠品」——全塞进 `Order` 的方法会 **接口膨胀**。
+4. **封装被破坏**：调用方可以直接改 `order.Lines`，破坏不变量。
+
+本质矛盾是：**多种消费者** 要以 **不同方式访问同一集合**，但 **底层存储** 会随性能需求变化；客户端不应 **绑定某一种 `for` 写法**。典型写法如下：
 
 ```go
-type Order struct {
-    ID     string
-    Status string
-    Lines  []OrderLine // 组合模式下的根列表；也可能是 DB 行 ID
-}
-
-// 仓储导出：手写递归扫叶子 SKU——与 Composite 里别的遍历重复
 func exportPickList(order Order) []PickItem {
     var out []PickItem
-    var walk func(OrderLine)
-    walk = func(line OrderLine) {
-        switch l := line.(type) {
-        case ProductLine:
-            out = append(out, PickItem{SKU: l.SKU, Qty: l.Quantity})
-        case BundleLine:
-            for _, c := range l.Children {
-                walk(c)
-            }
-        }
-    }
-    for _, line := range order.Lines {
-        walk(line)
-    }
+    var walk func(OrderLine) // 手写递归——Validate、Reserve 又要写一遍
+    walk = func(line OrderLine) { /* switch ProductLine / BundleLine */ }
+    for _, line := range order.Lines { walk(line) }
     return out
 }
-
-// 报表：直接依赖 []Order，换 ES 分页时要改这里
-func reportPaidOrders(orders []Order, page, size int) []OrderSummary {
-    start := page * size
-    if start >= len(orders) {
-        return nil
-    }
-    end := start + size
-    if end > len(orders) {
-        end = len(orders)
-    }
-    var sums []OrderSummary
-    for _, o := range orders[start:end] {
-        if o.Status != "paid" {
-            continue
-        }
-        sums = append(sums, summarize(o))
-    }
-    return sums
-}
 ```
-
-1. **遍历逻辑重复**：导出、对账、库存释放、券分摊 **各自写递归或嵌套 `for`**；改明细类型（加「赠品行」）要 **改每一处 walk**。
-2. **客户端与存储紧耦合**：报表 `[]Order` 分页；订单中心改成 **DB cursor / ES scroll** 时，**所有** `len(orders)`、`orders[i]` 都要重写。
-3. **多种遍历策略难并存**：同一订单树要 **「仅叶子」**、**「深度优先含 bundle 节点」**、**「跳过赠品」**——全塞进 `Order` 的方法会 **接口膨胀**。
-4. **违反单一职责与封装**：`OrderRepository` 既要 **查库**，又要让调用方知道 **返回的是 slice 还是 map**；调用方 **越权** 改 `order.Lines` 破坏不变量。
-5. **与组合 / 命令的分工错位**：[组合](/cs-fundamentals/design-patterns/composite) 管 **节点上的一致操作**；[命令](/cs-fundamentals/design-patterns/command) 管 **单步可撤销写**——这里要解决的是 **以统一方式访问集合元素**，且 **遍历算法可替换**。
-
-本质矛盾是：**多种消费者** 要以 **不同顺序、不同过滤** 访问 **同一批订单或明细**，但 **集合内部表示** 会随性能需求变化（内存树 → 分页 SQL → 流式 RPC）；客户端不应 **绑定某一种 `for` 写法**。
-
-### 迭代器 vs 直接 `range` / 回调
-
-| 方式 | 特点 | 何时够用 |
-| :--- | :--- | :--- |
-| **暴露 `[]T` + `range`** | 零抽象、Go 惯用 | 小列表、存储永不变、只有一种遍历 |
-| **函数式 `Each(fn)` 回调** | 简单封装 | 不需多种 Iterator、不需暂停/续扫 |
-| **迭代器对象** | 多种策略、可暂停、可换底层 | 树遍历、分页、过滤、存储迁移、批处理管道 |
-
-Go 1.23+ 的 `iter.Seq` / `iter.Pull` 是 **语言级迭代器**；GoF 迭代器模式与 **`range` over func** 思想一致——文档用 **显式 `Iterator` 接口** 对齐 GoF，工程上可 **薄封装到 `iter.Seq`**。
 
 ## 意图
 

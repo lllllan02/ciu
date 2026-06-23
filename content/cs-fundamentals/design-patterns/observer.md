@@ -11,57 +11,28 @@ order: 18
 
 ## 问题
 
-`OrderService` 在每次状态变更后 **直接调用所有下游**：
+订单支付、发货、取消之后，要 **通知用户、更新搜索、写审计、加积分、推 WMS**…… 每加一种下游，就要在 `OrderService` 里 **多调一个方法**。
+
+下游少时还能应付；副作用一多，问题就会一起暴露：
+
+1. **难扩展**：加直播推送、发票、风控回写，都要改 `OrderService` 的多个方法。
+2. **职责混杂**：领域服务既 **改状态**，又 **管通知、索引、埋点**，违反 [单一职责](/cs-fundamentals/design-patterns#设计原则)。
+3. **同步路径变慢**：`MarkPaid` 等齐邮件、ES、积分才返回——慢依赖拖垮写接口。
+4. **测试组合爆炸**：单测 `MarkPaid` 必须 mock 六个副作用服务。
+
+本质矛盾是：**一个领域事实**（订单已支付）会 **触发 N 个独立下游**，且 N 持续增加；写状态的核心逻辑 **不应** 认识每一个下游类型。典型写法如下：
 
 ```go
 func (s *OrderService) MarkPaid(ctx context.Context, orderID string) error {
-    order, err := s.repo.Get(ctx, orderID)
-    if err != nil {
-        return err
-    }
-    order.Status = StatusPaid
-    if err := s.repo.Save(ctx, order); err != nil {
-        return err
-    }
     // 写库成功后——扇出散落在此
     _ = s.email.SendPaidConfirmation(order)
     _ = s.sms.SendPaid(order.UserID)
     _ = s.search.IndexOrder(order)
     _ = s.loyalty.AccruePoints(order)
-    _ = s.analytics.Track("order_paid", order.ID)
-    _ = s.audit.Log("order.paid", orderID)
-    // 产品又要「大促直播间订单推弹幕」——再改 OrderService
-    return nil
-}
-
-func (s *OrderService) MarkShipped(ctx context.Context, orderID, tracking string) error {
-    // … Save …
-    _ = s.email.SendShipped(order)
-    _ = s.sms.SendShipped(order.UserID)
-    _ = s.search.IndexOrder(order)
-    // 重复：每种状态一套 Notify 列表
+    // 产品又要「大促直播间推弹幕」——再改 OrderService
     return nil
 }
 ```
-
-1. **违反开闭**：每加 **直播推送、发票、风控回写**，都要 **改 OrderService** 三个方法。
-2. **职责混杂**：领域服务既 **改状态**，又 **管通知、索引、埋点**——违反 [单一职责](/cs-fundamentals/design-patterns#设计原则)。
-3. **同步路径膨胀**：`MarkPaid` **等齐** 邮件、ES、积分 **才返回**——慢依赖 **拖垮写接口**；某观察者 panic **可能拖死主流程**。
-4. **测试组合爆炸**：单测 `MarkPaid` 必须 mock **六个副作用服务**。
-5. **与 Facade / 命令的分工错位**：[外观](/cs-fundamentals/design-patterns/facade) 管 **用例编排**；[命令](/cs-fundamentals/design-patterns/command) 管 **可撤销写**——这里要解决 **状态变更后的多订阅者通知**，不是 **再写一遍 PlaceOrder**。
-
-本质矛盾是：**一个领域事实**（订单已支付）会 **触发 N 个独立下游**，且 N **持续增加**；写状态的核心逻辑 **不应** 认识每一个下游类型。
-
-### 观察者 vs 直接调用 vs 全局 EventBus
-
-| 方式 | 耦合 | 典型形态 | 何时够用 |
-| :--- | :--- | :--- | :--- |
-| **OrderService 内硬调** | 主题 **依赖** 所有下游 | 同步、难扩展 | 永远只有 1 个副作用 |
-| **观察者（经典）** | 主题 **只知 Observer 接口** | Subject 维护订阅列表 | 单进程、需类型化事件 |
-| **领域 EventBus** | 发布者 **只知 Bus** | `bus.Publish(evt)` | 跨模块、观察者很多 |
-| **消息队列** | 发 **集成事件** 到 MQ | 异步、跨服务 | 微服务扇出 |
-
-EventBus 常是观察者 **工程化变体**；GoF 观察者强调 **Subject–Observer 抽象** 与 **可替换的订阅表**。
 
 ## 意图
 

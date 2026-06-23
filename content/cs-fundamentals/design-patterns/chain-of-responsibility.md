@@ -11,59 +11,29 @@ order: 13
 
 ## 问题
 
-`CheckoutFacade` 已在内部完成预占、扣款、落库。运营又要求：**下单前** 依次做购物车合法性、库存、优惠券、风控；**退款** 时小额自动退、中额主管批、大额财务批。团队先在 Facade 与 `RefundService` 里 **硬编码**：
+下单前要依次做购物车校验、库存检查、优惠券验证、风控；退款要按金额分流到自动批、主管批、财务批。最直接的做法是在 `CheckoutFacade` 和 `RefundService` 里 **硬编码一长串 if**。
+
+规则少时还能应付；每加一条风控或合规检查，问题就会一起暴露：
+
+1. **难扩展**：加一条规则就要改 Facade 源码；不同渠道想关掉某一环，只能再加 `if cfg.X`。
+2. **职责混杂**：Facade 既管 **编排**（预占→支付→落库），又管 **十余条校验**，违反 [单一职责](/cs-fundamentals/design-patterns#设计原则)。
+3. **调用方仍知道太多**：B 端想跳过 App 专属风控、跨境站要多一环关税估算——各入口复制不同 if 顺序。
+4. **审批规则难维护**：「100 元以下自动退」改成「VIP 自动退、普通 50 元以下」时，`switch amount` 又长又脆。
+
+本质矛盾是：**完成一次业务** 往往需要 **多步检查或分级审批**，但 **链有多长、哪一步处理** 应能 **独立配置**；发送方只应 **把请求交给链头**。典型写法如下：
 
 ```go
 func (f *CheckoutFacade) PlaceOrder(ctx context.Context, req PlaceOrderRequest) error {
-    if err := validateCart(req); err != nil {
-        return err
-    }
-    if err := f.checkInventory(ctx, req); err != nil {
-        return err
-    }
-    if err := validateCoupon(req); err != nil {
-        return err
-    }
+    if err := validateCart(req); err != nil { return err }
+    if err := f.checkInventory(ctx, req); err != nil { return err }
+    if err := validateCoupon(req); err != nil { return err }
     if f.cfg.EnableFraud {
-        if err := f.fraud.Check(ctx, req); err != nil {
-            return err
-        }
+        if err := f.fraud.Check(ctx, req); err != nil { return err }
     }
-    if req.ShipToCountry != "CN" && !f.compliance.CrossBorderOK(req) {
-        return ErrCompliance
-    }
-    // … 真正的 PlaceOrder 编排
+    // … 真正的下单编排
     return f.placeOrderCore(ctx, req)
 }
-
-func (s *RefundService) RequestRefund(ctx context.Context, r RefundRequest) error {
-    switch {
-    case r.Amount <= 10000:
-        return s.autoApprove(ctx, r)
-    case r.Amount <= 100000:
-        return s.supervisor.Approve(ctx, r)
-    default:
-        return s.finance.Approve(ctx, r)
-    }
-}
 ```
-
-1. **开闭困难**：每加一条风控规则、每个新国家合规，都要 **改 Facade / RefundService** 源码；A/B 渠道想 **关掉某一环** 只能再加 `if cfg.X`。
-2. **职责混杂**：`CheckoutFacade` 既管 **编排**（预占→支付→落库），又管 **十余条校验**——违反 [单一职责](/cs-fundamentals/design-patterns#设计原则)。
-3. **发送方仍知道太多**：B 端代客下单想 **跳过 App 专属风控**、跨境站要多一环 **关税估算**，调用方开始复制 **不同 if 顺序**。
-4. **审批层级难扩展**：「100 元以下自动退」改成「VIP 自动退、普通用户 50 元以下」时，`switch amount` **又长又脆**。
-5. **与外观 / 装饰的分工错位**：[外观](/cs-fundamentals/design-patterns/facade) 解决 **多子系统联合使用**；[装饰器](/cs-fundamentals/design-patterns/decorator) 解决 **同一对象上叠加计价增强**——这里要解决的是 **多个独立处理者按链传递请求**，且 **链可配置、可增减环**。
-
-本质矛盾是：**完成一次业务** 往往需要 **多步检查或分级审批**，但 **哪一步处理、链有多长** 应能 **独立变化**；发送方（Facade、HTTP Handler）只应 **把请求交给链头**，不应 **认识每一个 Validator / Approver 类型**。
-
-### 责任链的两种常见形态
-
-| 形态 | 行为 | 电商例子 |
-| :--- | :--- | :--- |
-| **单处理者**（经典 GoF） | 链上 **只有一个** 环真正「接单」；其余 **转发** | 退款：自动批 → 主管 → 财务，**命中一档即处理并结束** |
-| **管道 / 全会签**（工程常见） | **每一环都必须通过**；失败则 **短路**；通过则 **交给 next** | 下单前：购物车 → 库存 → 券 → 风控，**全部 OK 才进** `placeOrderCore` |
-
-文档 **分节讲** 两种形态；实现上常共用同一 `Handler` 接口与 `SetNext` 组装方式。HTTP 中间件、`grpc` 拦截器与 **管道式责任链** 是同一思想。
 
 ## 意图
 

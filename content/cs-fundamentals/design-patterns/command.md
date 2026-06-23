@@ -11,48 +11,32 @@ order: 14
 
 ## 问题
 
-运营工具与客服工单开始直接调用 `OrderService`：
+运营后台改数量、改地址，大促结束批量关单，离线 App 要把操作 **先入队、联网后再执行**——同一类操作会从 **HTTP、MQ、CLI** 等多种入口触发，且常要 **撤销、重试、审计回放**。
+
+最直接的做法是各入口 **直接调** `OrderService` 的方法。操作种类少时还能应付；产品要 Undo 和批量重试时，问题就会一起暴露：
+
+1. **调用方与领域紧耦合**：Handler、Consumer、脚本都依赖 `OrderService` 十几个方法，改签名要改所有入口。
+2. **无法撤销 / 重做**：改数量没有记录旧值；产品要「撤销」只能手写反向 SQL，易漏字段。
+3. **难以排队与重试**：削峰关单、失败重试需要 **把操作存下来再执行**——现在只有即时方法调用。
+4. **审计与回放弱**：日志记了「谁调了 API」，但没有 **可重放的命令对象**。
+
+本质矛盾是：**同一类业务操作** 会从 **多种入口、多种时机** 触发，且常要 **记录、重试、撤销**；却用 **分散的直接方法调用** 来表达。典型写法如下：
 
 ```go
 func (h *AdminHandler) AdjustQuantity(w http.ResponseWriter, r *http.Request) {
-    orderID := r.URL.Query().Get("order_id")
-    sku := r.URL.Query().Get("sku")
-    qty, _ := strconv.Atoi(r.URL.Query().Get("qty"))
-    if err := h.orders.SetLineQuantity(r.Context(), orderID, sku, qty); err != nil {
-        http.Error(w, err.Error(), 500)
-        return
-    }
-    // 产品又要「撤销上一次改数量」——这里没有记录旧值，也没统一 Undo
+    // 直接调 Service——没有记录旧值，也没有统一 Undo
+    h.orders.SetLineQuantity(r.Context(), orderID, sku, qty)
 }
 
 func (s *FlashSaleRollback) RollbackOversold(ctx context.Context, ids []string) error {
     for _, id := range ids {
         if err := s.orders.Cancel(ctx, id); err != nil {
-            return err // 中途失败：前面已取消的怎么回滚？也没法重试单条
+            return err // 中途失败：前面已取消的怎么回滚？
         }
     }
     return nil
 }
 ```
-
-1. **调用方与接收者紧耦合**：HTTP Handler、MQ Consumer、CLI 都 **直接依赖** `OrderService` 的十几个方法；改签名要 **改所有入口**。
-2. **无法撤销 / 重做**：改数量、改地址、加备注 **没有统一历史**；产品要「撤销」只能 **手写反向 SQL**，易漏字段。
-3. **难以排队与重试**：离线同步、削峰关单、失败重试 需要 **把操作存下来再执行**——现在只有 **即时方法调用**。
-4. **审计与回放弱**：日志里记了「谁调了 API」，但 **没有可重放的命令对象**；合规要求 **逐条回放人工操作** 时困难。
-5. **宏操作难组合**：「选中 200 单批量改仓」「大促回滚取消+释放库存」若在每个脚本里 **for 循环调 Service**，失败补偿 **散落各处**。
-6. **与 Facade / 责任链的分工错位**：[外观](/cs-fundamentals/design-patterns/facade) 管 **完整用例编排**；[责任链](/cs-fundamentals/design-patterns/chain-of-responsibility) 管 **可插拔校验链**——这里要解决的是 **把「改订单一行」这类操作封装成可调度、可撤销的请求对象**。
-
-本质矛盾是：**同一类业务操作** 会从 **多种入口、多种时机** 触发（同步 HTTP、异步队列、批处理脚本），且常要 **记录、重试、撤销**；却用 **分散的直接方法调用** 表达，调用方 **认识每一个 Receiver 方法**。
-
-### 命令 vs 简单函数 / 事件
-
-| 方式 | 特点 | 何时够用 |
-| :--- | :--- | :--- |
-| **直接调 Service** | 简单、零抽象 | 一次性脚本、永不需要 Undo/队列 |
-| **领域事件** | 通知「已发生什么」，常不可撤销 | 只读扇出、审计流水、跨服务广播 |
-| **命令对象** | 封装「要做什么」，可 Execute/Undo/Enqueue | 需要撤销、排队、宏命令、操作日志 |
-
-事件与命令 **可并存**：`AdjustQuantityCommand.Execute` 成功后 **再发** `OrderLineChanged` 事件通知搜索索引——命令管 **写与回滚**，事件管 **扇出**。
 
 ## 意图
 

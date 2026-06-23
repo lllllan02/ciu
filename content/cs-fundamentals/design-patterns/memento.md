@@ -11,62 +11,26 @@ order: 17
 
 ## 问题
 
-运营草稿编辑开始 **在外部摊开订单内部状态**：
+运营编辑未支付订单时，可能要 **多步试改再一键回到某个检查点**；代客下单草稿还要 **自动存档、崩溃恢复**。需要 **保存和恢复复杂对象状态**，但状态结构应该 **封装在对象内部**。
+
+最直接的做法是让 Caretaker **直接序列化整个 struct**，或 Handler **手写还原逻辑**。字段少时还能应付；明细树嵌套深了，问题就会一起暴露：
+
+1. **封装被破坏**：History 持有完整 `OrderDraft`，UI 层可直接改明细而不经领域方法。
+2. **快照不一致**：浅拷贝导致明细树共享；深拷贝逻辑散落在 Caretaker 外。
+3. **恢复漏字段**：手写 Revert 只还原部分字段，券与行级分摊的不变量被破坏。
+4. **与命令 Undo 分工不清**：单步改数量用 Command 够用；连续十步混改后「回到编辑开始前」需要 **全量快照**。
+
+本质矛盾是：**需要保存/恢复复杂状态**，但 Caretaker 只应 **像存文件一样存 opaque 快照**，不应 **知道明细怎么深拷贝、怎么校验恢复**。典型写法如下：
 
 ```go
-type OrderDraft struct {
-    ID      string
-    Lines   []OrderLine
-    Address Address
-    Coupon  string
-    Note    string
-    version int // 内部版本，不应被 Caretaker 改
-}
-
 type DraftHistory struct {
-    snapshots []OrderDraft // 整 struct 拷贝——Caretaker 能改任意字段
+    snapshots []OrderDraft // Caretaker 能改任意字段；浅拷贝共享 Lines
 }
 
 func (h *DraftHistory) Save(d OrderDraft) {
-    h.snapshots = append(h.snapshots, d) // 浅拷贝：Lines 切片共享
-}
-
-func (h *DraftHistory) Restore(i int) OrderDraft {
-    return h.snapshots[i] // 外部拿到 mutable OrderDraft，可绕过校验
-}
-
-// AdminHandler 为了 Undo 自己拼旧值
-func (h *AdminHandler) RevertOrder(w http.ResponseWriter, r *http.Request) {
-    var backup struct {
-        Lines   []OrderLine
-        Address Address
-        Coupon  string
-    }
-    json.Unmarshal([]byte(r.FormValue("backup")), &backup)
-    draft.Lines = backup.Lines
-    draft.Address = backup.Address
-    // 忘了 Note、分摊缓存、version——恢复后不一致
+    h.snapshots = append(h.snapshots, d)
 }
 ```
-
-1. **封装破坏**：History 持有 **完整 `OrderDraft`**，UI 层可 **直接改 Lines** 而不经领域方法。
-2. **快照不一致**：浅拷贝 **明细树共享**；深拷贝逻辑 **散落在 Caretaker**，与 [组合](/cs-fundamentals/design-patterns/composite) 结构 **不同步**。
-3. **恢复漏字段**：Hand-written Revert **只还原部分字段**；券与行级分摊 **不变量破坏**。
-4. **与命令 Undo 重复却更强**：单步改数量用 Command 够；**连续十步混改** 后「回到编辑开始前」要 **全量快照**，Command 栈 **深且难维护**。
-5. **审计与存储边界模糊**：DB 里存 JSON blob，**任何服务都能 Unmarshal 篡改**——违反 **针对接口编程** 与 **最少知识**。
-
-本质矛盾是：**需要保存/恢复复杂对象状态**，但 **状态结构应封装在 Originator 内**；Caretaker 只应 **像存文件一样存 opaque 快照**，不应 **知道明细怎么深拷贝、怎么校验恢复**。
-
-### 备忘录 vs 命令 Undo vs 直接 JSON
-
-| 方式 | 保存什么 | 封装 | 何时够用 |
-| :--- | :--- | :--- | :--- |
-| **命令 Undo** | 逆操作参数（`oldQty`） | 好 | **单步、可逆** 操作 |
-| **备忘录** | Originator **一致状态快照** | **最好**（opaque Memento） | **多字段/检查点/崩溃恢复** |
-| **整 struct JSON** | 全部字段 | **差**（外部可读可改） | 快速原型、无领域不变量 |
-| **原型 Clone** | **新对象** 副本 | 中 | **分支草稿**，非同一对象恢复 |
-
-命令与备忘录 **可组合**：每步仍发 Command 写库；**会话级** 「还原到检查点」用 Memento **覆盖 Originator**。
 
 ## 意图
 

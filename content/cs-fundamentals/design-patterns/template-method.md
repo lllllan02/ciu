@@ -11,72 +11,23 @@ order: 21
 
 ## 问题
 
-各渠道开始 **复制整条下单流水线**：
+App、B 端、跨境站都要 **预占→计价→支付→落库**，骨架相同，但 **前置校验、收款方式、下单后通知** 各不同。最直接的做法是为每个渠道 **各写一遍完整 PlaceOrder**。
+
+渠道少时还能应付；每多一个渠道，问题就会一起暴露：
+
+1. **骨架重复**：预占 → 计价 → 收款 → 落库 → 失败补偿 **复制多份**——改「Save 失败要 Refund」容易漏改 B2B。
+2. **顺序难统一**：跨境把合规日志放 Pay 前，App 放 Save 后——没有单一真相。
+3. **改一步要改多处**：加「落库后发领域事件」要改每个 Checkout 实现。
+4. **容易跳过步骤**：子类自己拼流程时，可能 **先 Pay 后 Reserve** 或 **漏 Release**。
+
+本质矛盾是：**PlaceOrder 的阶段划分稳定**，但 **若干阶段的实现因渠道变化**；不应 **为每个渠道重写整条算法**。典型写法如下：
 
 ```go
 func (s *AppCheckout) PlaceOrder(ctx context.Context, req PlaceOrderRequest) error {
-    if err := s.preCheckChain.Handle(ctx, &req); err != nil {
-        return err
-    }
-    if err := s.inventory.Reserve(ctx, req.Lines); err != nil {
-        return err
-    }
-    amount := s.pricing.Total(ctx, req)
-    if err := s.payment.Pay(ctx, req.UserID, amount); err != nil {
-        _ = s.inventory.Release(ctx, req.Lines)
-        return err
-    }
-    orderID, err := s.orders.Save(ctx, req)
-    if err != nil {
-        _ = s.payment.Refund(ctx, req.UserID, amount)
-        _ = s.inventory.Release(ctx, req.Lines)
-        return err
-    }
-    _ = s.notify.SendSMS(ctx, req.UserID, orderID)
-    return nil
-}
-
-func (s *B2BCheckout) PlaceOrder(ctx context.Context, req PlaceOrderRequest) error {
-    if err := s.validatePO(ctx, req); err != nil { // 不同前置
-        return err
-    }
-    if err := s.inventory.Reserve(ctx, req.Lines); err != nil {
-        return err
-    }
-    amount := s.pricing.Total(ctx, req)
-    if err := s.credit.ChargeAccount(ctx, req.AccountID, amount); err != nil { // 不同支付
-        _ = s.inventory.Release(ctx, req.Lines)
-        return err
-    }
-    orderID, err := s.orders.Save(ctx, req)
-    if err != nil {
-        _ = s.credit.Reverse(ctx, req.AccountID, amount)
-        _ = s.inventory.Release(ctx, req.Lines)
-        return err
-    }
-    _ = s.notify.SendEmail(ctx, req.AccountID, orderID) // 不同通知
-    return nil
+    // 预占 → 计价 → 在线支付 → 落库 → 发短信
+    // B2BCheckout、CrossBorderCheckout 各复制一遍，只改中间几行
 }
 ```
-
-1. **骨架重复**：预占 → 计价 → 收款 → 落库 → 失败补偿 **复制三份**——改「Save 失败要 Refund」**漏改 B2B**。
-2. **顺序难统一**：跨境站 **把合规日志放在 Pay 前**；App **放在 Save 后**——**无单一真相**。
-3. **违反 DRY 与开闭**：加 **全局「落库后发领域事件」** 要 **改每个 Checkout**。
-4. **与 Facade / 策略错位**：[外观](/cs-fundamentals/design-patterns/facade) 应 **对外一个入口**；[策略](/cs-fundamentals/design-patterns/strategy) 管 **Total 怎么算**——这里要解决 **用例骨架相同、步骤实现因渠道而异**。
-5. **子类若自己拼流程**：容易 **跳过 Release** 或 **先 Pay 后 Reserve**——应用 **模板固定顺序**。
-
-本质矛盾是：**PlaceOrder 的阶段划分稳定**，但 **若干阶段的实现因渠道变化**；不应 **为每个渠道重写整条算法**。
-
-### 模板方法 vs 外观 vs 策略 vs 复制粘贴
-
-| 方式 | 固定什么 | 变化什么 | 何时够用 |
-| :--- | :--- | :--- | :--- |
-| **复制粘贴** | 无 | 全流程 | 仅 1 个渠道 |
-| **外观 Facade** | 对外 API | 内部子系统编排 **一份** | 无渠道差异 |
-| **模板方法** | **步骤顺序与骨架** | **钩子步骤** | 多渠道 **同骨架** |
-| **策略** | Context 接口 | **整段算法** | 计价等 **无固定多步** |
-
-外观与模板 **可叠加**：Facade `PlaceOrder` **委托** `CheckoutTemplate` 的具体子类。
 
 ## 意图
 

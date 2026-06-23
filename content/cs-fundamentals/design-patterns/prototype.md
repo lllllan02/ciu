@@ -5,40 +5,30 @@ order: 4
 
 **原型模式**（Prototype）提供一种 **通过复制已有实例来创建新对象** 的方式，使 **克隆过程与使用过程分离**：调用方不必知道具体类型名，也不必重复昂贵的初始化步骤，只需从 **原型** 拿到一份拷贝，再按需改少量字段即可。
 
-在电商订单系统里，运营会预先配置好多套订单模板（明细规则、默认商品、元数据等），每次提交只需克隆一份再改买家和变量占位符——`Clone()` 比从零解析模板、拉取默认值、校验字段快得多，且改克隆体不会影响原模板。
-
-下文延续 [生成器模式](/cs-fundamentals/design-patterns/builder)：运营用生成器构建好订单母版，提交时按模板名克隆，只改买家和变量占位符。本文关注 **复用已有完整实例**，而不是从零构建一条订单。
-
 ## 问题
 
-业务里经常要造 **结构相同、只有少量字段不同** 的对象。若每次都从空对象重新填一遍，要么 **慢**（解析订单模板文件、拉取默认商品明细、校验元数据），要么 **容易抄错**（手动复制十几个字段，漏改 `metadata` 或浅拷贝共享了切片）。
+业务里经常要造 **结构相同、只有少量字段不同** 的对象——比如按同一份订单模板给不同买家下单，只改买家 ID 和个别变量。最直接的做法是 **照着模板手工填一个新 struct**。
+
+字段少时还能应付；模板一多、嵌套一深，问题就会一起暴露：
+
+1. **从头造太慢**：模板要从磁盘加载、预热配置，每条订单都重新拼一遍，浪费 I/O 和 CPU。
+2. **手工拷贝易错**：切片、map 赋值只复制引用，改新订单会 **污染原模板**；深拷贝逻辑散落各处。
+3. **职责搅在一起**：调用方既要选模板，又要自己实现安全复制，违反 [单一职责](/cs-fundamentals/design-patterns#设计原则)。
+4. **扩展成本高**：新增一种模板，每个提交点都要认识新类型并写一套拷贝代码，而不是统一 `Clone()`。
+
+本质矛盾是：**你手里已经有一份「对的」对象**，却还要走 **从零构造或逐字段手工复制** 的弯路。典型写法如下：
 
 ```go
-func sendFromTemplate(tpl *OrderTemplate, buyer string, vars map[string]string) error {
-    // 看似「复制订单模板」，实则共享内部切片 / map——改 n 会污染 tpl
+func sendFromTemplate(tpl *OrderTemplate, buyer string) error {
     n := &OrderTemplate{
-        BuyerID:        buyer,
-        InvoiceTitle:   tpl.InvoiceTitle,
-        Name:           tpl.Name,
-        Items:          cloneItems(tpl.Items, vars),
-        PaymentMethod:  tpl.PaymentMethod,
-        Priority:    tpl.Priority,
-        Gifts:          append([]string(nil), tpl.Gifts...),
-        Metadata:    tpl.Metadata,
+        BuyerID:  buyer,
+        Items:    tpl.Items,    // 切片共享——改 n 会污染 tpl
+        Metadata: tpl.Metadata, // map 同理
+        // …还有十几个字段要逐个抄
     }
     return submit(n)
 }
 ```
-
-订单模板一多、字段一嵌套，问题就会暴露：
-
-1. **初始化成本高**：订单模板从磁盘加载、渲染预览、预热支付渠道配置——每条订单都 `NewOrderBuilder()` 从头拼，浪费 CPU 与 I/O。
-2. **手工拷贝易错**：`Items`、`Gifts` 是切片，`Metadata` 是 map——赋值只复制引用，改克隆体会 **污染原型**；深拷贝逻辑散落在各处，维护困难。
-3. **创建逻辑与使用耦合**：调用方既要知道「从哪份订单模板来」，又要自己实现「怎么安全复制」，违反 [单一职责](/cs-fundamentals/design-patterns#设计原则)。
-4. **类型扩展困难**：新增一种订单模板（如「大促信用卡」）时，每个提交点都要认识新 struct 并写一套拷贝代码，而不是统一 `Clone()`。
-5. **与工厂 / 生成器分工不清**：工厂管「造哪类」、生成器管「怎么一步步拼」——当 **已有完整实例、只差改几个字段** 时，两者都显得笨重。
-
-本质矛盾是：**你手里已经有一份「对的」对象**，却还要走一遍 **从零构造或手工 field-by-field 复制** 的弯路。
 
 ## 意图
 

@@ -11,43 +11,16 @@ order: 6
 
 ## 问题
 
-[工厂方法](/cs-fundamentals/design-patterns/factory) 让业务只依赖 `PaymentProcessor` 接口：
+[工厂方法](/cs-fundamentals/design-patterns/factory) 已让业务只依赖统一的 `PaymentProcessor` 接口。实际接入支付渠道时，第三方 SDK 和遗留系统的方法名、参数往往 **对不上**——银行网关叫 `ChargeCard`，Stripe 叫 `CreatePayment`，返回值也不一样。
 
-```go
-type PaymentProcessor interface {
-    Pay(order Order) error
-}
+最直接的做法是在结算逻辑里 **按类型分支调用**。渠道少时还能应付；每多接一个，问题就会一起暴露：
 
-type Service struct {
-    processor PaymentProcessor
-}
+1. **业务与集成搅在一起**：结算代码要认识每一种第三方 API，违反 [单一职责](/cs-fundamentals/design-patterns#设计原则)。
+2. **无法统一依赖抽象**：字段类型写成具体 SDK 类型，就 **不能** 再声明为 `PaymentProcessor`，测试也难注入 mock。
+3. **改一处牵全身**：SDK 升级改方法名、遗留库不能动——都要改结算分支。
+4. **违反开闭原则**：每接一个渠道就要改已有代码，而不是只加新适配器。
 
-func (s *Service) Checkout(order Order) error {
-    return s.processor.Pay(order)
-}
-```
-
-实际接入支付渠道时，常遇到 **接口对不上** 的情况：
-
-```go
-// 遗留银行网关：三个参数，方法名也不同
-type LegacyBankClient struct{}
-
-func (LegacyBankClient) ChargeCard(account, currency string, amount int64) error {
-    // 调用遗留银行扣款协议…
-    return nil
-}
-
-// 第三方 Stripe SDK：返回订单 ID，参数是支付账号 + 订单明细
-type StripeClient struct{}
-
-func (StripeClient) CreatePayment(customerID string, amount int64) (paymentID string, err error) {
-    // 调用 Stripe HTTP API…
-    return "pi_xxx", nil
-}
-```
-
-若直接在 `Service` 里分支调用，问题立刻暴露：
+本质矛盾是：**你期望的接口** 和 **现有组件的接口** 不一致，却又 **不能或不愿** 改第三方代码。典型写法如下：
 
 ```go
 func (s *Service) Checkout(order Order) error {
@@ -57,20 +30,10 @@ func (s *Service) Checkout(order Order) error {
     case StripeClient:
         _, err := n.CreatePayment(order.CustomerID, order.Amount)
         return err
-    default:
-        // …
     }
     return nil
 }
 ```
-
-1. **调用方被迫认识每一种第三方 API**：`Service` 要知道 `ChargeCard` 还是 `CreatePayment`，违反 [单一职责](/cs-fundamentals/design-patterns#设计原则)——业务逻辑与集成细节缠在一起。
-2. **无法统一依赖抽象**：`Service` 的字段类型若写成 `interface{}` 或具体第三方类型，就 **不能** 再声明为 `PaymentProcessor`，测试注入 mock 也困难。
-3. **修改第三方库代价高**：Stripe SDK 升级改方法名、遗留库不能动——改 `Service` 牵一发而动全身。
-4. **违反开闭原则**：每接一个支付渠道，就要改 `Service` 的分支，而不是只加新代码。
-5. **与工厂方法的分工被打乱**：工厂本应在组装层选好实现；选型之后仍要在业务里写 `switch`，等于 **创建解耦了、使用没解耦**。
-
-本质矛盾是：**你期望的接口**（`Pay(order)`）和 **现有组件的接口**（`ChargeCard` / `CreatePayment`）不一致，却又 **不能或不愿** 改第三方/遗留代码。
 
 ## 意图
 

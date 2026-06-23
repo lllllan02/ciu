@@ -9,20 +9,16 @@ order: 9
 
 ## 问题
 
-[组合模式](/cs-fundamentals/design-patterns/composite) 让 `ProductLine` 与 `BundleLine` 都实现 `OrderLine`，`CheckoutService` 可以统一遍历。但当 **单行** 上要叠加多种 **可选、可组合** 的增强时，若用 **继承穷举**，类数会再次爆炸：
+同一行明细上，可能要叠加多种 **可选、可组合** 的增强：会员价、优惠券、礼品包装、运费险…… 最直接的做法是用 **子类穷举** 每一种组合——`MemberProductLine`、`MemberCouponProductLine`、`MemberCouponGiftWrapProductLine`……
 
-```go
-type ProductLine struct { /* 基础单品 */ }
+增强项少时还能应付；每多一种可选能力，组合数就 **指数增长**：
 
-type MemberProductLine struct { ProductLine }      // 会员价
-type CouponProductLine struct { ProductLine }       // 优惠券
-type GiftWrapProductLine struct { ProductLine }     // 礼品包装
+1. **子类爆炸**：N 种增强 → 最多 2^N 个子类，加「运费险」又要新增一批组合类。
+2. **职责混杂**：基础明细既要算单价，又要管折扣、包装费，违反 [单一职责](/cs-fundamentals/design-patterns#设计原则)。
+3. **运行时难灵活拆装**：大促只想开优惠券、关礼品包装——继承树在编译期就定死了，配置改不了。
+4. **测试困难**：想单测「优惠券怎么改 `Total()`」，得构造带会员、礼品包装的巨型子类。
 
-// 会员 + 优惠券 + 礼品包装 → 又要一个类
-type MemberCouponGiftWrapProductLine struct { /* … */ }
-```
-
-业务组装也会变成巨型 `switch`：
+本质矛盾是：**同一接口上的多种增强** 需要 **运行时按需叠加**，却用 **静态继承** 来表达。典型写法如下：
 
 ```go
 func buildLine(sku string, member, coupon, giftWrap bool) OrderLine {
@@ -37,16 +33,6 @@ func buildLine(sku string, member, coupon, giftWrap bool) OrderLine {
     }
 }
 ```
-
-再来 **满减分摊**、**积分抵扣**、**行级日志**，每种都要么加子类、要么改 `ProductLine` 本体：
-
-1. **组合爆炸回归**：`基础类型数 × 可选增强数` 若用继承表达，仍是乘法；违反 [开闭原则](/cs-fundamentals/design-patterns#设计原则)——加一种「运费险」要新增多个组合子类。
-2. **增强与核心职责缠在一起**：`ProductLine` 既要算 SKU 单价，又要管会员折扣规则、又要管礼品盒费用，违反 **单一职责**。
-3. **运行时无法灵活拆装**：大促只开优惠券、关礼品包装——继承树在编译期就定死了组合，配置层难以 `enableGiftWrap=false` 就拆掉一层。
-4. **与组合的分工错位**：组合解决 **树形部分-整体**；单行上的 **可叠加增强** 不是「再挂一个 child」，而是 **包装同一接口**。
-5. **测试困难**：想单测「优惠券怎么改 `Total()`」必须构造带会员、礼品包装的巨型子类，而不是只包一层 `CouponLine`。
-
-本质矛盾是：**同一接口上的多种横切增强** 需要 **动态组合**，却用 **静态继承** 或 **改基础类** 来表达。
 
 ## 意图
 

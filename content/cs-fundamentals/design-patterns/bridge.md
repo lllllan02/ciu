@@ -9,43 +9,25 @@ order: 7
 
 ## 问题
 
-[工厂方法](/cs-fundamentals/design-patterns/factory) 解决了 **选哪一种 PaymentProcessor**；[适配器](/cs-fundamentals/design-patterns/adapter) 解决了 **第三方 API 与 `PaymentProcessor` 接口不一致**。但当 **支付请求形态** 与 **支付后端** 都要独立扩展时，若用 **一个类扛两种职责** 或 **继承穷举组合**，问题会再次出现：
+支付系统里往往有 **两个独立会变的维度**：支付后端（支付宝、微信、Stripe…）和支付形态（直接支付、分期、退款…）。最直接的做法是为 **每一种组合** 写一个类——`AlipayDirectProcessor`、`WeChatInstallmentProcessor`……
+
+维度少时还能应付；两边都要扩展时，类数会 **相乘爆炸**：
+
+1. **组合爆炸**：每加一种后端或一种形态，就要新增多个类，且大量复制扣款代码。
+2. **两维绑死**：改分期逻辑要改每个后端的子类；换微信网关时，每种形态的类都要动。
+3. **难以独立测试**：测「分期」绕不开某个后端，测「支付宝」又绕不开某种形态。
+4. **职责混杂**：一个类同时管 **请求怎么组织** 和 **怎么调网关**，违反 [单一职责](/cs-fundamentals/design-patterns#设计原则)。
+
+本质矛盾是：**有两个独立变化的维度**，却用 **继承穷举每一种组合** 来表达。典型写法如下：
 
 ```go
-// 每种「支付后端 × 支付请求形态」一个具体类——组合爆炸
-type AlipayDirectPaymentProcessor struct{}
-type AlipayInstallmentPaymentProcessor struct{}
-type AlipayRefundPaymentProcessor struct{}
-type WeChatPayDirectPaymentProcessor struct{}
-type WeChatPayInstallmentPaymentProcessor struct{}
-type StripeDirectPaymentProcessor struct{}
-// 再来 PayPal、银行转账… 每加一种形态或支付后端，类数相乘
+// 后端 × 形态 → 类数相乘
+type AlipayDirectProcessor struct{}
+type AlipayInstallmentProcessor struct{}
+type WeChatDirectProcessor struct{}
+type WeChatInstallmentProcessor struct{}
+// 再加 Stripe、退款… 继续乘
 ```
-
-业务调用也会被迫认识所有组合：
-
-```go
-func checkout(kind, backend, orderID string, amount int64, vars map[string]string) error {
-    switch {
-    case backend == "alipay" && kind == "direct":
-        return (&AlipayDirectPaymentProcessor{}).Checkout(orderID, amount)
-    case backend == "alipay" && kind == "installment":
-        return (&AlipayInstallmentPaymentProcessor{}).CheckoutWithVars(orderID, vars)
-    case backend == "wechat_pay" && kind == "direct":
-        return (&WeChatPayDirectPaymentProcessor{}).Checkout(orderID, amount)
-    // …
-    }
-    return nil
-}
-```
-
-1. **类数量随维度相乘**：`支付后端数 × 支付请求形态数` 个 PaymentProcessor，违反 [开闭原则](/cs-fundamentals/design-patterns#设计原则)——加一种退款请求就要新增类，且往往复制粘贴「调 银行网关 / 调 微信支付」的扣款代码。
-2. **抽象与实现绑死**：订单分期支付逻辑散落在 `AlipayInstallmentPaymentProcessor`、`WeChatPayInstallmentPaymentProcessor` 里，改订单模板引擎要改多处；换微信支付网关时，每种支付请求形态的 WeChatPay 类都要动。
-3. **无法独立测试**：想单测「订单分期支付」必须构造带真实支付后端依赖的 PaymentProcessor；想单测「支付宝扣款」又绕不开某种支付请求形态。
-4. **违反单一职责与合成复用**：一个类同时管 **格式化** 和 **支付后端 I/O**；能用组合拆开的，却用继承堆子类。
-5. **与工厂/适配器的分工错位**：工厂选「哪一个类」、适配器翻译接口——但 **类本身设计错了**（两种变化耦在一个继承树里），工厂只能在一堆组合类里 `switch`。
-
-本质矛盾是：**有两个（或更多）独立变化维度**，却用 **单继承层次** 或 **巨型类** 表达，导致扩展任一侧都要动另一侧。
 
 ## 意图
 

@@ -11,63 +11,32 @@ order: 20
 
 ## 问题
 
-计价与运费开始 **用巨型 switch**：
+整单计价、运费、优惠券分摊会随 **渠道、会员等级、大促、B2B 合约** 切换不同规则。最直接的做法是在 `PricingEngine` 里写 **巨型 switch**——`if 直播间`、`if 金卡会员`、`if B2B 合约`……
+
+规则少时还能应付；每加一种渠道或等级，问题就会一起暴露：
+
+1. **难扩展**：加「直播间专享价」要改 Total 和 ShippingFee 多处 switch。
+2. **规则重复**：报表、购物车预览、结算页 **复制同一套 if**。
+3. **职责混杂**：`PricingEngine` 同时管标价、会员、大促、B2B、运费，违反 [单一职责](/cs-fundamentals/design-patterns#设计原则)。
+4. **难以单测**：测「金卡 88 折」必须构造带 live_flash 分支的 Engine。
+
+本质矛盾是：**同一入口**（`Calculate(order)`）背后有 **多种互斥或择一的规则**，且规则随业务扩展；Context **不应** 认识每一种 if 分支。典型写法如下：
 
 ```go
 func (e *PricingEngine) Total(ctx context.Context, order Order, user User, channel string) int64 {
-    var sum int64
     for _, line := range order.Lines {
-        unit := line.UnitPrice
         switch {
         case channel == "live_flash" && e.flashSKUs[line.SKU]:
             unit = e.flashPrice(line.SKU)
         case user.Tier == "gold":
-            unit = int64(float64(unit) * 0.88)
+            unit = int64(float64(line.UnitPrice) * 0.88)
         case order.B2BContractID != "":
             unit = e.contractPrice(order.B2BContractID, line.SKU)
-        default:
-            unit = line.UnitPrice
+        // …
         }
-        sum += unit * int64(line.Quantity)
-    }
-    if channel == "live_flash" {
-        sum = max(sum-5000, 0) // 直播间满减又写一遍
-    }
-    return sum
-}
-
-func (e *PricingEngine) ShippingFee(ctx context.Context, order Order, channel string) int64 {
-    switch channel {
-    case "b2b":
-        return 0
-    case "cross_border":
-        return e.weightBasedFee(order)
-    default:
-        if order.Subtotal() >= 9900 {
-            return 0
-        }
-        return 800
     }
 }
 ```
-
-1. **违反开闭**：每加 **渠道、等级、合约**，改 **Total 与 ShippingFee** 多处 switch。
-2. **规则重复**：报表、购物车预览、结算页 [中介者](/cs-fundamentals/design-patterns/mediator) **复制同一套 if**。
-3. **职责混杂**：`PricingEngine` 同时管 **标价、会员、大促、B2B、运费**——违反 [单一职责](/cs-fundamentals/design-patterns#设计原则)。
-4. **难以单测**：测「Gold 会员 88 折」必须 **构造带 live_flash 分支的 Engine**。
-5. **与装饰器 / 状态的分工错位**：[装饰器](/cs-fundamentals/design-patterns/decorator) 管 **单行可选增强**；[状态](/cs-fundamentals/design-patterns/state) 管 **订单能否 Pay**——这里要解决 **整单级可替换算法**，不是 **包装 ProductLine** 或 **Pending→Paid**。
-
-本质矛盾是：**同一入口**（`Calculate(order)`）背后有 **多种互斥或择一的规则族**，且规则 **随业务扩展**；不应让 Context **认识每一种 if 分支**。
-
-### 策略 vs 装饰器 vs 状态 vs 桥接
-
-| 方式 | 结构 | 典型问题 | 何时够用 |
-| :--- | :--- | :--- | :--- |
-| **switch** | 一个函数 N 分支 | 难扩展 | 1～2 条规则 |
-| **策略** | Context 委托 Strategy | **算法可互换** | 会员价/大促价/B2B 价 |
-| **装饰器** | 层层包装同接口 | **增强可叠加** | 行级券+包装 |
-| **状态** | Context 委托 State | **生命周期迁移** | 待支付/已发货 |
-| **桥接** | 抽象 × 实现 组合 | **两维独立扩展** | 支付形态×后端 |
 
 ## 意图
 

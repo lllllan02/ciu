@@ -11,66 +11,24 @@ order: 16
 
 ## 问题
 
-结算页各区块开始 **互相直接调用**：
+结算页上有明细、地址、优惠券、配送、支付、合计等多个 **对等面板**——用户改数量、改地址、用优惠券时， **多个区块都要跟着刷新**。
+
+最直接的做法是让每个面板 **直接持有** 其他面板的引用并互调。面板少时还能应付；区块一多，问题就会一起暴露：
+
+1. **网状耦合**：6 个面板两两引用，加「发票抬头」区块要改 5 个 struct 的字段。
+2. **联动规则散落**：「用券后免运」写在优惠券组件，「改地址禁支付」写在地址组件——同一规则重复或互相遗漏。
+3. **难复用与测试**：单测地址表单必须 mock 合计、运费、支付三个面板。
+4. **违反迪米特法则**：面板只管自己的 UI，却 **跨层知道** 运费怎么算、分期怎么刷。
+
+本质矛盾是：**多个对等组件** 需要 **随用户操作彼此同步**，但 **谁该响应谁** 的规则会频繁变化，不应让每个组件 **自己维护一张依赖图**。典型写法如下：
 
 ```go
-type LineItemsPanel struct {
-    summary *SummaryPanel
-    shipping *ShippingPanel
-    coupon   *CouponWidget
-}
-
 func (p *LineItemsPanel) OnQtyChanged(sku string, qty int) {
     p.summary.RecalcTotal()
     p.shipping.RecalcFee() // 重量变了
     p.coupon.Revalidate()  // 满减门槛可能变
 }
-
-type AddressForm struct {
-    shipping *ShippingPanel
-    summary  *SummaryPanel
-    payment  *PaymentPanel
-}
-
-func (f *AddressForm) OnAddressChanged(addr Address) {
-    f.shipping.SetDestination(addr)
-    f.summary.RecalcTotal()
-    f.payment.FilterByRegion(addr.Country) // 跨境禁某些渠道
-}
-
-type CouponWidget struct {
-    summary  *SummaryPanel
-    shipping *ShippingPanel
-    payment  *PaymentPanel
-}
-
-func (c *CouponWidget) OnCouponApplied(code string) {
-    c.summary.ApplyDiscount(code)
-    if c.summary.FreeShipping() {
-        c.shipping.ZeroFee()
-    }
-    c.payment.RefreshInstallmentOptions()
-}
 ```
-
-1. **网状耦合**：6 个面板 **两两引用**，潜在 **N(N−1)** 条边；加「发票抬头」区块要 **改 5 个 struct 的字段**。
-2. **联动逻辑散落**：「用券后免运」写在 `CouponWidget`，「改地址禁支付」写在 `AddressForm`——**同一业务规则** 重复或 **互相遗漏**。
-3. **难以复用与测试**：单测 `AddressForm` 必须 **mock Summary、Shipping、Payment**；B 端工作台想 **少一块支付面板**，要 **改所有 New 函数**。
-4. **违反迪米特法则**：面板本应只管 **自己的 UI 状态**，却 **跨层知道** 运费怎么算、分期怎么刷。
-5. **与外观 / 装饰的分工错位**：[外观](/cs-fundamentals/design-patterns/facade) 管 **最终提交用例**；[装饰器](/cs-fundamentals/design-patterns/decorator) 管 **行级计价**——这里要解决的是 **结算页内多个对等 UI/领域块如何联动**，不是 **HTTP 一次 PlaceOrder**。
-
-本质矛盾是：**多个对等对象** 需要 **随用户操作彼此同步**，但 **谁该响应谁** 的规则会 **频繁变化**；不应让每个对象 **维护一张依赖图**。
-
-### 中介者 vs 外观 vs 事件总线
-
-| 方式 | 谁在用 | 交互形态 | 何时够用 |
-| :--- | :--- | :--- | :--- |
-| **直接互引** | 同事互调 | 网状 | 2 个控件、规则永不改 |
-| **外观 Facade** | **外部** 客户端 | 客户端 → 子系统 **单向** | 一次提交、无页内联动 |
-| **中介者 Mediator** | **内部** 同事 | 同事 → 中介 → 同事 | 多面板联动、规则集中 |
-| **全局 EventBus** | 任意发布订阅 | 广播、弱类型 | 跨模块解耦；**结算页内** 仍要 **显式编排** 防乱序 |
-
-EventBus 可与 Mediator **结合**：中介 **订阅/发布** 领域事件，但 **页内联动顺序**（先计价再刷支付）仍由 **CheckoutMediator** 保证。
 
 ## 意图
 

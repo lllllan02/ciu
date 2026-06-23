@@ -11,82 +11,30 @@ order: 19
 
 ## 问题
 
-订单操作开始 **用枚举 + 巨型 switch**：
+订单有 **待支付、已支付、已发货、已取消** 等多个阶段——`Pay`、`Ship`、`Cancel`、`AdjustLines` 在不同阶段 **能不能调用、调用后变什么状态**，规则各不相同。
+
+最直接的做法是用 **枚举 + 巨型 switch**：每个 Service 方法里判断 `order.Status`。状态少时还能应付；生命周期变复杂后，问题就会一起暴露：
+
+1. **难扩展**：加「部分发货」状态，要改 Pay、Ship、Cancel、AdjustLines 所有 switch。
+2. **转换规则分散**：「已支付取消 = 退款 + 释库存」只在 Cancel 里写一半，Refund API 又写一遍。
+3. **状态可被绕过**：`order.Status = StatusPaid` 随处可赋，非法转换拦不住。
+4. **测试组合爆炸**：每种 `(status, operation)` 组合都要单独测。
+
+本质矛盾是：**订单在不同阶段允许的操作不同**，且 **操作成功会触发状态迁移**；这些规则 **不应** 以 `if status` 重复形式散落在各 Service。典型写法如下：
 
 ```go
-type OrderStatus string
-
-const (
-    StatusPending   OrderStatus = "pending"
-    StatusPaid      OrderStatus = "paid"
-    StatusShipped   OrderStatus = "shipped"
-    StatusCompleted OrderStatus = "completed"
-    StatusCancelled OrderStatus = "cancelled"
-)
-
 func (s *OrderService) Pay(ctx context.Context, orderID string) error {
     order, _ := s.repo.Get(ctx, orderID)
     switch order.Status {
     case StatusPending:
         order.Status = StatusPaid
         return s.repo.Save(ctx, order)
-    case StatusPaid, StatusShipped, StatusCompleted:
-        return ErrAlreadyPaid
     case StatusCancelled:
         return ErrOrderCancelled
-    default:
-        return ErrInvalidStatus
+    // Cancel、Ship、AdjustLines 里又要写一遍 switch…
     }
-}
-
-func (s *OrderService) Cancel(ctx context.Context, orderID string) error {
-    order, _ := s.repo.Get(ctx, orderID)
-    switch order.Status {
-    case StatusPending:
-        order.Status = StatusCancelled
-        return s.repo.Save(ctx, order)
-    case StatusPaid:
-        // 还要退款？释放库存？——逻辑开始膨胀
-        return s.refundAndCancel(ctx, order)
-    case StatusShipped:
-        return ErrCannotCancelShipped
-    default:
-        return ErrInvalidStatus
-    }
-}
-
-func (s *AdminService) AdjustLines(ctx context.Context, orderID string, lines []OrderLine) error {
-    order, _ := s.repo.Get(ctx, orderID)
-    if order.Status != StatusPending && order.Status != StatusPaid {
-        return ErrNotEditable
-    }
-    if order.Status == StatusPaid && order.CrossBorder {
-        return ErrCrossBorderPaidEdit
-    }
-    // 每个操作重复 status 判断
-    order.Lines = lines
-    return s.repo.Save(ctx, order)
 }
 ```
-
-1. **违反开闭**：加 **「部分发货」** 状态，要 **改 Pay、Ship、Cancel、AdjustLines** 所有 switch。
-2. **转换规则分散**：「已支付取消 = 退款 + 释库存」只在 `Cancel` 里写一半，`Refund` API **又写一遍**。
-3. **行为与状态脱节**：`order.Status = StatusPaid` **随处可赋**——绕过 **非法转换**。
-4. **测试组合爆炸**：每种 `(status, operation)` 组合 **测一个 Service 方法**。
-5. **与观察者 / 命令的分工错位**：[观察者](/cs-fundamentals/design-patterns/observer) 管 **事后通知**；[命令](/cs-fundamentals/design-patterns/command) 管 **操作封装**——这里要解决 **生命周期内行为随状态变化**，不是 **发邮件** 或 **AdjustQuantity 对象化**（虽可组合）。
-
-本质矛盾是：**订单在不同阶段允许的操作不同**，且 **操作成功会触发状态迁移**；这些规则 **不应** 以 **`if status` 重复** 形式散落在各 Service。
-
-### 状态模式 vs 枚举 + switch vs 策略
-
-| 方式 | 状态迁移 | 行为位置 | 何时够用 |
-| :--- | :--- | :--- | :--- |
-| **枚举 + switch** | 手动赋值 | 每个方法里 switch | 3 态、规则永不改 |
-| **状态模式** | **State 内** Transition | 各 `XxxState` 类 | 多态行为、转换复杂 |
-| **策略** | **通常无** 自动迁移 | 可互换算法 | 计价、路由 **非生命周期** |
-| **表驱动 FSM** | 配置表 | 数据 + 引擎 | 状态极多、规则常由运营配置 |
-
-表驱动是状态模式的 **工程变体**；GoF 状态强调 **多态 State 对象**。
 
 ## 意图
 

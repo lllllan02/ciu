@@ -9,19 +9,18 @@ order: 8
 
 ## 问题
 
-订单明细天然是 **树形结构**：一行可能是单个 SKU，也可能是「春节礼盒」——里面 3 个单品 + 1 个子套餐。结算、优惠券分摊、库存预占都要 **遍历这棵树**。
+订单明细天然是 **树形结构**：一行可能是单个 SKU，也可能是「春节礼盒」——里面还有子商品、子套餐。结算、校验、预占库存都要 **遍历这棵树**。
 
-若没有统一抽象，业务代码会在 **每种操作** 里重复分支与递归：
+没有统一抽象时，每种操作都要 **自己写一遍** `if 单品 else 套餐` 加递归。明细类型少时还能应付；操作一多，问题就会一起暴露：
+
+1. **分支散落各处**：算总价、校验、预占各自维护一套判断，加一种明细类型（如赠品行）要改 **所有** 方法。
+2. **调用方被迫认识树结构**：结算服务不能简单调 `line.Total()`，必须自己知道怎么递归。
+3. **递归易错**：有的方法忘了递归子节点，有的多递归一层，嵌套深了 bug 难查。
+4. **职责混杂**：业务流程和 **树怎么遍历** 搅在一起，违反 [单一职责](/cs-fundamentals/design-patterns#设计原则)。
+
+本质矛盾是：**部分-整体层次** 客观存在，客户端却 **不能** 用同一套接口对待「单个明细」和「明细组合」。典型写法如下：
 
 ```go
-type CartItem struct {
-    Kind     string // "product" | "bundle"
-    SKU      string
-    Quantity int
-    UnitPrice int64
-    Children []CartItem
-}
-
 func cartTotal(items []CartItem) int64 {
     var sum int64
     for _, item := range items {
@@ -29,43 +28,12 @@ func cartTotal(items []CartItem) int64 {
         case "product":
             sum += item.UnitPrice * int64(item.Quantity)
         case "bundle":
-            sum += bundleTotal(item.Children) // 每种操作都要写一遍递归
+            sum += cartTotal(item.Children) // Validate、Reserve 又要写一遍
         }
     }
     return sum
 }
-
-func validateCart(items []CartItem) error {
-    for _, item := range items {
-        switch item.Kind {
-        case "product":
-            if item.SKU == "" {
-                return fmt.Errorf("missing sku")
-            }
-        case "bundle":
-            if len(item.Children) == 0 {
-                return fmt.Errorf("empty bundle")
-            }
-            if err := validateCart(item.Children); err != nil {
-                return err
-            }
-        default:
-            return fmt.Errorf("unknown kind: %q", item.Kind)
-        }
-    }
-    return nil
-}
 ```
-
-再来 **预占库存**、**分摊优惠券**、**导出明细 JSON**，每种都要复制类似的 `switch` + 递归：
-
-1. **类型分支散落各处**：`Total`、`Validate`、`Reserve` 各自维护一套 `product` / `bundle` 判断，改一种明细类型（如加「赠品行」）要改 **所有** 方法，违反 [开闭原则](/cs-fundamentals/design-patterns#设计原则)。
-2. **客户端被迫认识树结构**：`CheckoutService` 要知道「套餐里还有子套餐」，无法只调 `line.Total()` 就拿到整单金额。
-3. **递归逻辑重复且易错**：深度嵌套时，有的方法忘了递归、有的多递归一层，bug 难查。
-4. **违反单一职责与针对接口编程**：结算服务既管 **业务流程**，又管 **树怎么遍历**；无法对「整棵明细树」注入 mock 做单元测试。
-5. **与适配器 / 桥接的分工错位**：接口已经接好、支付维度也拆开了，但 **订单内容本身是树**——问题出在 **没有统一的组件抽象**，而不是创建或桥接。
-
-本质矛盾是：**部分-整体层次** 在业务里客观存在，客户端却 **不能** 用同一套接口对待「单个明细」和「明细组合」。
 
 ## 意图
 

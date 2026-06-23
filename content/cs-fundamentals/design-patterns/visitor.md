@@ -11,68 +11,26 @@ order: 22
 
 ## 问题
 
-`OrderLine` 接口开始 **为每种下游报表加方法**：
+对账要导出 JSON、WMS 要拣货单、财务要税务分类、合规要审计日志——这些操作都要 **区分单品和礼盒**，且各自递归规则不同。最直接的做法是在 `OrderLine` 接口上 **不断加方法**：`ExportJSON()`、`ToPickList()`、`TaxCategory()`……
+
+操作种类少时还能应付；每加一种报表，问题就会一起暴露：
+
+1. **接口膨胀**：`OrderLine` 上 7+ 方法；加「海关申报格式」要改接口和所有实现，违反 [接口隔离](/cs-fundamentals/design-patterns#设计原则)。
+2. **职责混杂**：`ProductLine` 既算价，又懂 JSON、税务、审计，违反 **单一职责**。
+3. **递归重复**：每种 Export 各自写 traverse，与迭代器的 walk **重复且不一致**。
+4. **开闭困难**：新 `GiftLine` 节点要实现全部报表方法，哪怕拣货只关心叶子 SKU。
+
+本质矛盾是：**对象结构（明细类型）相对稳定**，但 **作用于其上的操作种类** 持续增加；不应 **把每种操作都塞进元素接口**。典型写法如下：
 
 ```go
 type OrderLine interface {
     Total() int64
     Validate() error
-    ReserveInventory() error
-    ExportJSON(w io.Writer) error
+    ExportJSON(w io.Writer) error    // 每种报表加一个方法…
     AppendPickList(out *[]PickItem)
     TaxLines(out *[]TaxRow)
-    AuditRecord(out *[]AuditEntry)
 }
-
-type ProductLine struct { SKU string; Quantity int; UnitPrice int64 }
-
-func (p ProductLine) ExportJSON(w io.Writer) error { /* … */ }
-func (p ProductLine) AppendPickList(out *[]PickItem) {
-    *out = append(*out, PickItem{SKU: p.SKU, Qty: p.Quantity})
-}
-func (p ProductLine) TaxLines(out *[]TaxRow) { /* … */ }
-
-type BundleLine struct {
-    BundleID string
-    Children []OrderLine
-}
-
-func (b BundleLine) ExportJSON(w io.Writer) error {
-    // 礼盒 JSON 结构不同于单品——又要写一遍
-    for _, c := range b.Children {
-        if err := c.ExportJSON(w); err != nil {
-            return err
-        }
-    }
-    return nil
-}
-
-func (b BundleLine) AppendPickList(out *[]PickItem) {
-    for _, c := range b.Children {
-        c.AppendPickList(out) // 赠品行？空 bundle？
-    }
-}
-// TaxLines、AuditRecord 继续复制递归…
 ```
-
-1. **接口膨胀**：`OrderLine` **7+ 方法**；加 **「海关申报格式」** 要 **改接口 + 所有实现**——违反 [接口隔离](/cs-fundamentals/design-patterns#设计原则)。
-2. **职责混杂**：`ProductLine` 既 **算价**，又 **懂 JSON、税务、审计**——违反 **单一职责**。
-3. **递归重复**：每种 Export **各自写 traverse**——与 [迭代器](/cs-fundamentals/design-patterns/iterator) 的 walk **重复且不一致**。
-4. **开闭困难**：新 **GiftLine** 节点要 **实现全部报表方法**，哪怕 **拣货只关心叶子 SKU**。
-5. **与组合 / 迭代的分工错位**：[组合](/cs-fundamentals/design-patterns/composite) 管 **结构一致的核心操作**；[迭代器](/cs-fundamentals/design-patterns/iterator) 管 **访问顺序**——这里要解决 **多种外部操作如何按节点类型分派**，且不 **胖化 Component**。
-
-本质矛盾是：**对象结构（明细类型）相对稳定**，但 **作用于其上的操作种类** 持续增加；不应 **把每种操作都塞进元素接口**。
-
-### 访问者 vs 组合内聚方法 vs 迭代器 vs type switch
-
-| 方式 | 新操作成本 | 新元素类型成本 | 何时够用 |
-| :--- | :--- | :--- | :--- |
-| **方法在 OrderLine 上** | **改接口 + 所有类** | 实现所有方法 | 3～5 个稳定操作 |
-| **type switch + walk** | 新函数 + 改 switch | 改 **所有** walk | 操作少、临时脚本 |
-| **迭代器** | 新 Iterator | 改 Iterator 逻辑 | **只要元素、不分类型操作** |
-| **访问者** | **新 Visitor 类** | **改所有 Visitor** | **操作多、元素类型少变** |
-
-访问者与迭代器 **可组合**：`BundleLine.Accept` **递归 Accept**；Visitor 内 **不必** 手写 type switch。
 
 ## 意图
 
