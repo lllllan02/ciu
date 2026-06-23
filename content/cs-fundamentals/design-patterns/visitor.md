@@ -32,36 +32,7 @@ type OrderLine interface {
 
 用一句话说：**表示一个作用于某对象结构中的各元素的操作。它使你可以在不改变各元素的类的前提下定义作用于这些元素的新操作。**
 
-引入 **Visitor** 接口（`VisitProduct`、`VisitBundle`…）；**Element** 提供 `Accept(Visitor)`；**ConcreteVisitor** 实现 **一种完整操作**（如 `PickListExporter`）；Client **`line.Accept(visitor)`**：
-
-```go
-exporter := &PickListExporter{}
-for _, line := range order.Lines {
-    line.Accept(exporter)
-}
-pickList := exporter.Result()
-```
-
-GoF 从 **结构** 角度的定义：
-
-> 表示一个作用于某对象结构中的各个元素的操作。访问者让你可以在不改变各元素的类的前提下定义作用于这些元素的新操作。
-
-### 和组合、迭代器、策略有啥不同
-
-| | 访问者 | 组合 | 迭代器 | 策略 |
-| :--- | :--- | :--- | :--- | :--- |
-| **动机** | **新操作不改 Element** | **统一树形接口** | **隐藏遍历** | **算法可换** |
-| **分派** | **双重分派** Accept+Visit | 虚方法/接口 | Next | Strategy.Calculate |
-| **谁递归** | **Composite.Accept** 调子节点 | Composite 方法内 | Iterator | N/A |
-| **电商例子** | JSON/拣货/税务 Visitor | Total/Validate | 扁平 SKU 迭代 | 会员计价 |
-
-#### 访问者像「把 switch 挪到 Visitor 吗？」
-
-**是，但 Accept/Visit 让分派 **集中且类型安全**。**Client 不写** `switch line.(type)`——**元素自己** 调正确的 `VisitXxx`。
-
-#### 访问者和迭代器冲突吗？
-
-**不冲突。** `PickListExporter` **只关心叶子** 时，`VisitBundle` **只递归 Accept**；`VisitProduct` **收集 SKU**——迭代器 **扁平化** 也可，但 **礼盒节点要特殊 JSON** 时 **Visitor 更合适**。
+`OrderLine` 只保留 `Accept(visitor)` 与核心领域方法；导出 JSON、拣货单、税务分类等各自实现为一个 Visitor。新增报表类型时加新 Visitor，不必在 `ProductLine`、`BundleLine` 上不断加方法。
 
 ## 解决方案
 

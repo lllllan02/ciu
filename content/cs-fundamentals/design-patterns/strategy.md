@@ -38,29 +38,7 @@ func (e *PricingEngine) Total(ctx context.Context, order Order, user User, chann
 
 用一句话说：**定义一系列的算法，把它们一个个封装起来，并且使它们可相互替换。策略模式使得算法可独立于使用它的客户而变化。**
 
-引入 **Strategy** 接口；**PricingEngine**（Context）持有 `pricingStrategy`、`shippingStrategy`；组装层按 **user/channel/contract** **注入**：
-
-```go
-engine := NewPricingEngine(ResolvePricingStrategy(user, channel, order))
-total := engine.Total(ctx, order)
-```
-
-GoF 从 **结构** 角度的定义：
-
-> 定义一系列的算法，把它们一个个封装起来，并且使它们可相互替换。策略模式使得算法可独立于使用它的客户而变化。
-
-### 和状态、装饰器、工厂有啥不同
-
-| | 策略 | 状态 | 装饰器 | 工厂方法 |
-| :--- | :--- | :--- | :--- | :--- |
-| **动机** | **算法族可替换** | **行为随生命周期变** | **动态叠加职责** | **创建哪个类** |
-| **谁选择** | **Client / 组装层** | **State 内部迁移** | **Client 套娃** | **Factory** |
-| **是否叠加** | **通常择一** | N/A | **多层 inner** | N/A |
-| **电商例子** | 会员整单计价 | 待支付可 Cancel | 行级 CouponLine | 选 AlipayProcessor |
-
-#### 策略和装饰器能一起用吗？
-
-**应该一起用。** 策略定 **「Gold 会员行单价怎么取」**；装饰器在 **该行** 再叠 **礼品包装费**——**订单级算法** vs **行级增强** 分层。
+整单计价、运费、分摊等规则封装成独立策略，`PricingEngine` 只委托当前策略计算。新增直播间专享价、B2B 合约价时加新 Strategy，不必在 Engine 里堆 `switch channel`。
 
 ## 解决方案
 

@@ -36,34 +36,7 @@ func (s *OrderService) Pay(ctx context.Context, orderID string) error {
 
 用一句话说：**允许对象在内部状态改变时改变它的行为，对象看起来好像修改了它的类。**
 
-引入 **State** 接口；**Context**（`Order`）持有 `state` 并 **委托** `Pay`/`Ship`/…；各 **ConcreteState** 实现 **本态行为** 与 **`TransitionTo`**：
-
-```go
-order := LoadOrder(ctx, id) // 内部 state = PaidState{}
-return order.Pay(ctx)       // 委托 → PaidState.Pay → ErrAlreadyPaid
-return order.Ship(ctx, trk) // → PaidState.Ship → 切 ShippedState + Save
-```
-
-GoF 从 **结构** 角度的定义：
-
-> 允许对象在内部状态改变时改变它的行为。对象看起来好像修改了它的类。
-
-### 和策略、观察者、命令有啥不同
-
-| | 状态 | 策略 | 观察者 | 命令 |
-| :--- | :--- | :--- | :--- | :--- |
-| **动机** | **行为随生命周期变** | **算法可互换** | **变更后通知** | **封装操作** |
-| **谁切换** | **State / Context 内部** | **客户端设置** | 不切换 | Invoker 执行 |
-| **同一方法语义** | **随状态不同** | 策略不同 | N/A | 固定 Execute |
-| **电商例子** | 待支付可 Cancel、已发货不可 | 会员价算法 | OrderPaid 发邮件 | AdjustQty Undo |
-
-#### 状态像「把 switch 拆成类」吗？
-
-**是。** 每个 `case StatusPaid:` 的 **行为块** → `PaidState` 的方法；Context **eliminate switch**。
-
-#### 状态和观察者冲突吗？
-
-**不冲突，分层。** `PaidState.Ship` 成功 → `o.setState(ShippedState{})` → `o.publish(OrderShipped{…})`——**状态管规则与迁移**；**观察者管扇出**。
+`Order` 持有当前 `State` 并委托 `Pay`、`Ship`、`Cancel` 等操作——待支付可取消、已发货不可取消等规则内聚在各自的状态类里，合法迁移也在状态切换时完成，从而消除各处 `switch order.Status`。
 
 ## 解决方案
 

@@ -34,37 +34,7 @@ func (s *OrderService) MarkPaid(ctx context.Context, orderID string) error {
 
 用一句话说：**定义对象间的一种一对多的依赖关系，使得每当一个对象的状态发生改变时，所有依赖于它的对象都得到通知并自动更新。**
 
-在电商里「状态改变」常落实为 **领域事件**（`OrderPaid`、`OrderShipped`）：主题 **Publish** 不可变事件；观察者 **Handle(event)**：
-
-```go
-if err := orders.MarkPaid(ctx, orderID); err != nil {
-    return err
-}
-// MarkPaid 内部 Save 成功后：
-publisher.Publish(ctx, OrderPaid{OrderID: orderID, UserID: order.UserID, Amount: order.Total})
-```
-
-GoF 从 **结构** 角度的定义：
-
-> 定义对象间的一种一对多的依赖关系，使得当一个对象的状态发生改变时，所有依赖于它的对象都得到通知并自动更新。
-
-### 和外观、中介者、命令有啥不同
-
-| | 观察者 | 外观 | 中介者 | 命令 |
-| :--- | :--- | :--- | :--- | :--- |
-| **动机** | **状态变更 → 通知依赖者** | **简化用例编排** | **封装同事间交互** | **封装操作为对象** |
-| **方向** | 主题 → 观察者 **单向** | 客户端 → 子系统 | 同事 ↔ 中介 **双向协调** | Invoker → Command → Receiver |
-| **时机** | **事后** 扇出 | **事中** 编排 | **交互过程中** 联动 | **执行/撤销** 操作 |
-| **能否 Undo** | **否**（已发生事实） | 编排内可补偿 | 不强调 Undo | **可 Undo** |
-| **电商例子** | 支付后发邮件/索引 | PlaceOrder | 结算页改地址刷运费 | AdjustQuantity Undo |
-
-#### 观察者和领域事件是一回事吗？
-
-**工程上常是。** `OrderPaid` 事件 + `Subscribe(handler)` **就是** 观察者；DDD 强调 **「已发生事实、不可变、可持久化」**。经典 Observer 偏 **内存订阅表**；EventBus/MQ 偏 **跨边界**——**模式思想相同**。
-
-#### 观察者能替代 Facade 编排吗？
-
-**不能。** 支付失败要 **Release 库存** 必须在 [外观](/cs-fundamentals/design-patterns/facade) **同步编排** 内完成；**支付成功后的邮件** 适合 Observer **异步**。**关键路径编排** vs **副作用扇出** 分层。
+订单支付、发货、取消成功后，主题只 `Publish(OrderPaid)` 等领域事件；发短信、更新搜索、加积分等副作用由各观察者订阅处理。新增下游只需注册新 Observer，不必改 `OrderService` 的写方法。
 
 ## 解决方案
 

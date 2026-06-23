@@ -31,61 +31,7 @@ func (h *AdminHandler) ShowOrder(w http.ResponseWriter, r *http.Request) {
 
 用一句话说：**为其他对象提供一种代理以控制对这个对象的访问。**
 
-引入 **代理**（Proxy）实现与 `OrderRepository` **相同接口**，内部持有 **真实主题** `real SQLOrderRepository`（或工厂延迟构造）。客户端只依赖接口；**控制逻辑** 进代理，**领域与持久化** 留在主题：
-
-```go
-// 客户端不变
-order, err := repo.GetOrder(ctx, orderID)
-
-// 实际可能是 ProtectionProxy → VirtualProxy → SQLOrderRepository
-```
-
-GoF 从 **结构** 角度的定义：
-
-> 为其他对象提供一种代理以控制对这个对象的访问。
-
-### 和装饰器、适配器、外观有啥不同
-
-四者都可能「A 持有 B、实现某接口」，但 **动机与接口关系** 不同：
-
-| | 代理 | 装饰器 | 适配器 | 外观 |
-| :--- | :--- | :--- | :--- | :--- |
-| **动机** | **控制访问** 主题（懒加载、鉴权、远程、缓存） | **增强** 同一对象的行为（折扣、日志） | **转换** 不兼容接口 | **简化** 多子系统 **联合使用** |
-| **接口** | 与 **Subject 相同** | 与 **Component 相同** | 实现 Client 期望的 **Target** | 常 **新定义** 粗粒度 API |
-| **客户端感知** | 常 **不知** 是代理（透明） | 常 **主动** 套多层装饰 | 知悉 Adapter 存在 | 只认 Facade |
-| **主题数量** | **一个** 真实主题 | 可 **多层** 包装 | 通常 **一个** Adaptee | **多个** 子系统 |
-| **典型场景** | 懒加载订单明细、订单读权限 | 会员折 + 券 + 礼品包装 | Stripe SDK → `PaymentProcessor` | `PlaceOrder` 编排 |
-
-#### 代理和装饰器最容易混
-
-**结构** 上都是 `type X struct { inner SameInterface }`。**区分问一句**：这层是在 **「能不能 / 何时触达真实对象」**，还是在 **「触达之后多算什么」**？
-
-```go
-// 代理：没权限根本不调用 inner.GetOrder
-func (p *ProtectionProxy) GetOrder(ctx context.Context, id string) (*Order, error) {
-    if !p.auth.CanReadOrder(ctx, id) {
-        return nil, ErrForbidden
-    }
-    return p.real.GetOrder(ctx, id)
-}
-
-// 装饰器：先拿到结果，再叠加行为（审计日志不改变「能否读取」）
-func (d *AuditDecorator) GetOrder(ctx context.Context, id string) (*Order, error) {
-    order, err := d.inner.GetOrder(ctx, id)
-    d.audit.Log("order.read", id)
-    return order, err
-}
-```
-
-**可组合**：`AuditDecorator{ Inner: ProtectionProxy{ real: sqlRepo } }`——先鉴权（代理），再记日志（装饰）。别用 **一个类** 同时塞满鉴权 + 满减规则。
-
-#### 代理像「中间件 / 拦截器」吗？
-
-**是同类思想**——HTTP 中间件、`grpc.UnaryInterceptor`、Java 动态代理 **都在调用链上插入控制**。GoF 代理强调 **与领域接口同型** 的替身对象；中间件常是 **框架级** 管道。电商里 **`OrderRepository` 接口级代理** 不依赖 Web 框架，Worker、CLI 也能复用。
-
-#### 代理像「缓存包一层」吗？
-
-**缓存代理是代理的一种**——但代理还包含 **懒加载、鉴权、远程**；单纯 `map` 缓存若 **不实现 Subject 接口**、只是 helper，那是 **缓存工具**，不是 GoF 意义上的 Proxy。实现 `OrderRepository` 并在 `GetOrder` 内 **命中则返回、未命中则委托 real** → 缓存代理。
+代理实现与 `OrderRepository` 相同的接口，内部持有真实实现；在 `GetOrder`、`CheckStock` 等调用前后插入鉴权、懒加载、缓存、远程重试等逻辑。客户端仍只依赖接口，不必在每个 Handler 里重复这些控制代码。
 
 ## 解决方案
 

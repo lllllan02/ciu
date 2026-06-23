@@ -32,31 +32,7 @@ func (h *DraftHistory) Save(d OrderDraft) {
 
 用一句话说：**在不破坏封装的前提下，捕获一个对象的内部状态，并在该对象之外保存这个状态，以便以后可以将该对象恢复到原先的状态。**
 
-引入 **Originator** 提供 `Save()` / `Restore(m)`；**Memento** 对 Caretaker **只读 opaque**；**Caretaker** 维护 **栈或列表** 存 Memento，**不解析** 内容：
-
-```go
-caretaker.Push(draft.Save())        // 编辑前 checkpoint
-draft.ApplyManyChanges(...)
-draft.Restore(caretaker.Pop())      // 回到 checkpoint
-```
-
-GoF 从 **结构** 角度的定义：
-
-> 在不破坏封装的前提下，捕获一个对象的内部状态，并在该对象之外保存这个状态。这样以后就可将该对象恢复到原先保存的状态。
-
-### 和命令、原型、中介者有啥不同
-
-| | 备忘录 | 命令 | 原型 | 中介者 |
-| :--- | :--- | :--- | :--- | :--- |
-| **动机** | **保存/恢复状态** | **封装操作为对象** | **复制实例** | **封装同事交互** |
-| **核心对象** | Memento（快照） | Command（请求） | Prototype（克隆源） | Mediator |
-| **谁创建快照** | **Originator** | Command 在 Execute 前 **抓部分字段** | Originator `Clone()` | 不抓快照 |
-| **Caretaker 知内容吗** | **不应知** | Invoker **不知** Receiver 细节 | 客户端得 **用新对象** | 知 Context 但 **非 Memento** |
-| **电商例子** | 草稿检查点、崩溃恢复 | 改数量 Undo | 从模板复制订单 | 结算页联动 |
-
-#### 备忘录像「整对象 Undo」吗？
-
-**是，但强调封装。** Command Undo 是 **操作级**；Memento 是 **状态级**——「把 `OrderDraft` 整包回到 14:03」。编辑器 **Ctrl+Z** 有时 **命令栈**，有时 **快照栈**；复杂表单 **常两者并存**。
+`OrderDraft` 提供 `Save()` / `Restore(m)` 创建与还原快照；`DraftHistory` 只存 opaque 的 Memento，不读改明细字段。运营多步试改后，可一键回到任意检查点，且恢复快照的逻辑封装在 Originator 内。
 
 ## 解决方案
 

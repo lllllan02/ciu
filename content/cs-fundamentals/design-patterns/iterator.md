@@ -32,40 +32,7 @@ func exportPickList(order Order) []PickItem {
 
 用一句话说：**提供一种方法顺序访问一个聚合对象中的各个元素，而又不暴露该对象的内部表示。**
 
-引入 **迭代器**（Iterator）统一访问协议；**聚合**（Aggregate）提供 `Iterator()`（或 `AllLines()` 返回序列）；**具体迭代器** 实现 **叶子优先、过滤、分页** 等策略。报表服务 **只调** `repo.Iterator(FilterPaid).Next()`，不必 `import` 仓储的 SQL 细节：
-
-```go
-it := repo.Iterator(ctx, Filter{Status: "paid"}, Page{Offset: 0, Limit: 50})
-for it.HasNext() {
-    order, err := it.Next()
-    if err != nil {
-        return err
-    }
-    sums = append(sums, summarize(order))
-}
-```
-
-GoF 从 **结构** 角度的定义：
-
-> 提供一种方法顺序访问一个聚合对象中的各个元素，而又不暴露该对象的内部表示。
-
-### 和组合、命令、访问者有啥不同
-
-| | 迭代器 | 组合 | 命令 | 访问者 |
-| :--- | :--- | :--- | :--- | :--- |
-| **动机** | **解耦遍历与集合**；隐藏内部结构 | **统一部分-整体接口** | **封装操作为对象** | **把新操作从节点类挪走** |
-| **核心抽象** | `Iterator`（Next/HasNext） | `OrderLine`（Total 等） | `Command`（Execute） | `Visitor` + `Accept` |
-| **谁管顺序** | **Iterator** | Composite **递归顺序由方法隐含** | 队列 / Invoker 管 **执行顺序** | Visitor **定义遍历+操作** |
-| **典型能力** | 分页、过滤、多策略遍历 | 树上一致 `Total()` | Undo、排队 | 新增「打印/export」不改节点 |
-| **电商例子** | 扁平化拣货 SKU、订单分页 | 礼盒嵌套计价 | 批量关单命令 | 多种报表格式访问同一树 |
-
-#### 迭代器像「把 Composite 的递归挪出去」吗？
-
-**部分像。** `BundleLine.Total()` **内部仍递归**；迭代器给 **需要「逐个元素」而非「聚合结果」** 的场景——例如 **WMS 只要 SKU 列表**、**审计逐行打日志**。两者 **可共存**：Composite 管 **结构语义**；`LeafSKUIterator` 管 **扁平访问**。
-
-#### 迭代器和 `for range` 在 Go 里怎么选？
-
-**小团队、slice 稳定**：直接 `range order.Lines`。**要多种遍历或隐藏存储**：`OrderLinesIterator`、`OrderQueryIterator`。Go 1.23+ 可 **`func(yield func(OrderLine) bool)`** 作为 **轻量 Iterator**，对外仍不暴露 `[]OrderLine`。
+仓储导出、报表分页、对账游标等场景通过 `Iterator()` 逐个取元素，而不直接暴露 `[]OrderLine` 或 `[]Order`。底层从内存切片换成 DB 分页时，只改迭代器实现，调用方代码不变。
 
 ## 解决方案
 

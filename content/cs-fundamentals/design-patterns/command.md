@@ -38,44 +38,7 @@ func (s *FlashSaleRollback) RollbackOversold(ctx context.Context, ids []string) 
 
 用一句话说：**将一个请求封装为一个对象，从而让你可以用不同的请求对客户进行参数化，对请求排队或记录请求日志，以及支持可撤销的操作。**
 
-引入 **命令**（Command）统一接口；**具体命令** 持有参数并委托 **接收者**（Receiver）执行；**调用者**（Invoker）只调 `command.Execute()`，可选维护 **历史栈** 做 Undo/Redo：
-
-```go
-cmd := NewAdjustQuantityCommand(orders, orderID, sku, newQty)
-if err := invoker.Run(ctx, cmd); err != nil {
-    return err
-}
-// 运营点「撤销」
-if err := invoker.Undo(ctx); err != nil { ... }
-```
-
-GoF 从 **结构** 角度的定义：
-
-> 将一个请求封装为一个对象，从而使你可用不同的请求对客户进行参数化，对请求排队或记录请求日志，以及支持可撤销的操作。
-
-### 和责任链、外观、策略有啥不同
-
-| | 命令 | 责任链 | 外观 | 策略 |
-| :--- | :--- | :--- | :--- | :--- |
-| **动机** | **封装操作为对象**；解耦 Invoker 与 Receiver | **解耦发送方与多个处理者** | **简化多子系统编排** | **互换算法** |
-| **核心抽象** | `Command`（Execute/Undo） | `Handler`（Handle/转发） | `Facade`（PlaceOrder 等） | `Strategy`（Calculate 等） |
-| **是否存储请求** | **是**——可入队、日志、宏命令 | 通常 **当场沿链传递** | 编排 **立即执行** | 策略对象可复用，但语义是 **算法** 不是 **操作** |
-| **典型能力** | Undo、Redo、队列、批处理 | 可插拔校验、分级审批 | 固定用例流程 | 运行时换计价/支付路由规则 |
-| **电商例子** | 改数量并撤销、批量关单入队 | 下单前风控链 | 预占+支付+落库 | 会员价 vs 普通价算法 |
-
-#### 命令像「把 Facade 的一步拆成对象」吗？
-
-**部分像，但层次不同。** Facade 的 `PlaceOrder` 是 **用例级、多子系统、难整体 Undo** 的编排；命令适合 **领域内有明确逆操作的单步**，例如 `SetLineQuantity` ↔ 恢复旧数量、`ReserveInventory` ↔ `ReleaseInventory`。实践中常见分层：
-
-```text
-PlaceOrder（Facade 用例）
-  → 内部可记录 Saga 步骤；单步补偿常建模为 Command
-
-AdjustQuantity（Command）
-  → Execute 调 OrderService；Undo 写回 oldQty
-```
-
-大促 **整单取消** 若涉及支付退款、库存、通知，Undo 往往是 **另一条补偿用例**，不单靠一个 Command——但 **「取消请求」本身** 仍可封装为 `CancelOrderCommand` **入队重试**。
+改数量、改地址、批量关单等操作封装成命令对象，由 Invoker 执行并可选维护历史栈。HTTP、MQ、CLI 等入口只依赖命令接口，不必各自认识 `OrderService` 的十几个方法——从而支持撤销、排队与审计回放。
 
 ## 解决方案
 

@@ -34,26 +34,7 @@ func submitRefund(...) error {
 
 用一句话说：**保证一个类仅有一个实例，并提供一个访问它的全局访问点。**
 
-把「如何得到那唯一实例」封装进类型自身（或包级 API）；调用方通过 `Instance()` / `GetHub()` 获取，而不是到处 `NewCheckoutHub()`。GoF 从 **实现结构** 角度的定义是：
-
-> 保证一个类仅有一个实例，并提供一个访问它的全局访问点。
-
-与 [工厂方法](/cs-fundamentals/design-patterns/factory)、[原型](/cs-fundamentals/design-patterns/prototype) 的关系：
-
-| | 工厂方法 | 原型 | 单例 |
-| :--- | :--- | :--- | :--- |
-| 核心问题 | 解耦 **造哪一种** | 解耦 **怎么复制已有实例** | 保证 **只有一份** 协调实例 |
-| 实例数量 | 每次可造新的产品 | 每次 `Clone()` 得新副本 | **进程内唯一** |
-| 典型动机 | 类型选型、可替换实现 | 昂贵母版、大量相似对象 | 共享状态、全局资源 |
-| 典型入口 | `NewAlipayProcessor()` | `reg.Clone("bundle_reorder")` | `checkouthub.Instance()` |
-
-三者可 **组合**：工厂在组装层注入各支付渠道 `PaymentProcessor`；原型克隆订单模板；单例 `CheckoutHub` 统一限流与派发。
-
-> **命名说明**
->
-> - **单例模式**（本文，GoF Singleton）：类 + 私有构造 + 静态 `Instance()`——经典 OOP 写法。
-> - **包级单例**（Go 惯用法）：`var defaultHub = …` 或 `sync.Once` 懒初始化——**效果等同**，不必硬套 Java 式 `getInstance()`。
-> - **依赖注入替代**：把「唯一实例」在 `main` 里 `New` 一次再注入，**不调用** `Instance()`——很多 Go 项目更推荐，见 [组装实践](#依赖注入与单例的取舍)。
+把「如何得到那唯一实例」封装进类型自身（或包级 API）；调用方通过 `Instance()` / `GetHub()` 获取，而不是在每个提交路径上各自 `NewCheckoutHub()`——全局限流、连接池、指标由此共享。
 
 ## 解决方案
 

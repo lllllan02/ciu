@@ -30,37 +30,7 @@ func (p *LineItemsPanel) OnQtyChanged(sku string, qty int) {
 
 用一句话说：**用一个中介对象来封装一系列的对象交互。中介者使各对象不需要显式地相互引用，从而使其耦合松散，而且可以独立地改变它们之间的交互。**
 
-引入 **中介者**（Mediator）统一协调；**同事**（Colleague）只持有 `Mediator` 引用，状态变化时 **`Notify(event)`**；中介 **更新共享 CheckoutContext** 并 **回调** 需要刷新的同事：
-
-```go
-// 地址变更：面板只通知中介
-func (f *AddressForm) OnAddressChanged(addr Address) {
-    f.mediator.Notify(ColleagueAddress, Event{Type: AddressChanged, Payload: addr})
-}
-// 中介内：SetDestination → RecalcFee → RecalcTotal → FilterPayment
-```
-
-GoF 从 **结构** 角度的定义：
-
-> 用一个中介对象来封装一系列的对象交互。中介者使各对象不需要显式地相互引用，从而使其耦合松散，而且可以独立地改变它们之间的交互。
-
-### 和外观、观察者、责任链有啥不同
-
-| | 中介者 | 外观 | 观察者 | 责任链 |
-| :--- | :--- | :--- | :--- | :--- |
-| **动机** | **封装同事间交互** | **简化外部对子系统的使用** | **状态变化通知** | **请求沿链传递** |
-| **中心角色** | Mediator **双向协调** | Facade **对外门面** | Subject **广播** | Handler **链式** |
-| **同事是否互知** | **否** | 子系统 **可不知 Facade** | 订阅者 **可互调** | 处理者 **只认 next** |
-| **典型场景** | 对话框 / 结算页联动 | `PlaceOrder` | 订单状态变更推送 | 下单前校验链 |
-| **电商例子** | 改券刷新运付合计 | 提交订单编排 | 订单已支付 → 发短信 | 风控链 |
-
-#### 中介者像「页面内的 Facade」吗？
-
-**不像。** Facade **对外** 隐藏子系统；Mediator **对内** 让 **同级** 组件不互引。结算页 **提交** 仍调 [外观](/cs-fundamentals/design-patterns/facade) `PlaceOrder`；**页内编辑过程** 用 Mediator——**提交前联动** vs **提交动作** 分层。
-
-#### 中介者和 MVC Controller 一样吗？
-
-**部分像。** 富 Controller 也会 **收事件、调多个 ViewModel**——Mediator 把这段 **从 God Controller 抽成独立类型**，同事 **可复用于 App / Web**，且 **联动规则可单测**。
+结算页各面板状态变化时只 `Notify(mediator, event)`，由 `CheckoutMediator` 决定刷新运费、重算合计、过滤支付方式等联动——改地址不必直接持有合计、支付面板的引用。
 
 ## 解决方案
 
