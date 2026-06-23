@@ -225,7 +225,7 @@ func ExportPickList(order OrderLines) []PickItem {
 | **Go 无 Visitor 语法糖** | 接口方法 **随类型增长** |
 | **与迭代重叠** | 简单扁平 **Iterator 够用** |
 
-## 组装实践
+## 实践
 
 > **阅读提示**：先掌握「**Accept → VisitXxx，Composite 递归 Accept**」即可。本节是工程变体；初学可先跳过。
 

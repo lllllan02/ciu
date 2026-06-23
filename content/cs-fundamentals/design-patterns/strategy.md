@@ -245,7 +245,7 @@ func ResolveShippingStrategy(channel string, order Order) ShippingStrategy {
 | **与装饰边界** | 团队需约定 **何者 Strategy、何者 Decorator** |
 | **运行时切换错配** | 注入错 Strategy **难编译期发现**——集成测覆盖 |
 
-## 组装实践
+## 实践
 
 > **阅读提示**：先掌握「**Resolver 选 Strategy，Engine 委托 Calculate**」即可。本节是工程变体；初学可先跳过。
 

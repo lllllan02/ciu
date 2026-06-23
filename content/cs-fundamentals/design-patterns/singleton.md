@@ -175,7 +175,7 @@ func submitOrder(reg *OrderTemplateRegistry, buyer, orderID string) error {
 | **并发与生命周期** | 懒初始化要考虑 `sync.Once`；进程内唯一 ≠ 多副本部署时的分布式唯一 |
 | **过度使用** | 把本可注入的普通服务做成单例，扩大全局状态面 |
 
-## 组装实践
+## 实践
 
 > **阅读提示**：先掌握「`sync.Once` + `Instance()`」即可。本节是 Go 项目里的实现细节与替代方案；初学可先跳过。
 

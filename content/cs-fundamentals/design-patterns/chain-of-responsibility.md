@@ -294,7 +294,7 @@ func (s *RefundService) RequestRefund(ctx context.Context, r RefundRequest) erro
 | **性能** | 环过多时 **每次请求遍历**；极热路径可合并或编译期链 |
 | **与循环依赖** | Handler 互相引用子系统时，注意 **依赖方向** 仍指向领域服务 |
 
-## 组装实践
+## 实践
 
 > **阅读提示**：先掌握「**链头进入、每环处理或转发、发送方不知具体环**」即可。本节是工程变体；初学可先跳过。
 

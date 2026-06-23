@@ -78,7 +78,7 @@ type Observer interface {
 }
 ```
 
-可按 **事件名路由**，避免每个 Observer 里 **长 switch**——或用 **泛型** `Observer[OrderPaid]`（见 [组装实践](#组装实践)）。
+可按 **事件名路由**，避免每个 Observer 里 **长 switch**——或用 **泛型** `Observer[OrderPaid]`（见 [实践](#实践)）。
 
 ### 主题（Subject）——EventPublisher
 
@@ -206,7 +206,7 @@ func (s *OrderService) MarkPaid(ctx context.Context, orderID string) error {
 }
 ```
 
-**事务边界**：Save **成功后再 Publish**；若 Publish 失败，需 **Outbox / 重试**（见 [组装实践](#组装实践)）——避免 **库已改、下游未通知**。
+**事务边界**：Save **成功后再 Publish**；若 Publish 失败，需 **Outbox / 重试**（见 [实践](#实践)）——避免 **库已改、下游未通知**。
 
 ### 组装（Client）
 
@@ -259,7 +259,7 @@ func NewOrderModule(/* deps */) *OrderService {
 | **一致性与投递** | Save 与 Notify **非原子**——要 Outbox |
 | **订阅泄漏** | 忘记 Unsubscribe **内存泄漏**（长生命周期 UI） |
 
-## 组装实践
+## 实践
 
 > **阅读提示**：先掌握「**Save 成功后 Publish，Observer Handle**」即可。本节是工程变体；初学可先跳过。
 

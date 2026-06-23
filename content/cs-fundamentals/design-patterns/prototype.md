@@ -189,7 +189,7 @@ func submitBundleReorder(reg *OrderTemplateRegistry, buyer, sku string) error {
 | **调试链略长** | 「这份从哪个原型来」要跳注册表或接口 |
 | **与序列化拷贝混淆** | `json` 往返能深拷贝，但有性能与类型损失，不宜当默认方案 |
 
-## 组装实践
+## 实践
 
 > **阅读提示**：先掌握「`Clone()` + 改差异字段」即可。本节是 Go 项目里的实现细节；初学可先跳过。
 

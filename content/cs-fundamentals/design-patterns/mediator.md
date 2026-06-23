@@ -305,7 +305,7 @@ func (h *CheckoutHandler) Submit(w http.ResponseWriter, r *http.Request) {
 | **过度设计** | 两控件页面 **不必** 上 Mediator |
 | **并发** | 共享 `CheckoutContext` 要 **锁或单线程 UI 模型** |
 
-## 组装实践
+## 实践
 
 > **阅读提示**：先掌握「**同事 Notify，中介 Refresh**」即可。本节是工程变体；初学可先跳过。
 

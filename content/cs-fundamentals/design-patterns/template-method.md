@@ -286,7 +286,7 @@ func (f *CheckoutFacade) PlaceOrder(ctx context.Context, req PlaceOrderRequest) 
 | **与 Facade 边界** | 团队需约定 **谁是对外 Facade、谁是内部模板** |
 | **after 失败语义** | 落库后钩子失败 **是否补偿** 要 **文档化** |
 
-## 组装实践
+## 实践
 
 > **阅读提示**：先掌握「**PlaceOrder 固定顺序，Hooks 可变步骤**」即可。本节是工程变体；初学可先跳过。
 

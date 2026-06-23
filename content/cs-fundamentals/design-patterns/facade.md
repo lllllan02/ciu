@@ -217,7 +217,7 @@ worker := &OrderRetryWorker{checkout: facade}
 | **分布式事务错觉** | Facade 内 `Pay` + `Save` 不是 ACID——仍需 Saga、Outbox、幂等等 **真实** 一致性方案 |
 | **测试 Facade 仍要 mock 多依赖** | 但 mock 边界清晰：断言 **顺序与补偿**，而非测每个子系统内部 |
 
-## 组装实践
+## 实践
 
 > **阅读提示**：先掌握「Facade 组合 Subsystem + 单一 PlaceOrder + Client 只调 Facade」即可。本节是工程变体；初学可先跳过。
 

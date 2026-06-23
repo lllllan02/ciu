@@ -185,7 +185,7 @@ _ = stripeRefund.Refund("order-001", "用户取消订单")
 | **小项目显繁琐** | 固定组合少时，几个 PaymentProcessor 类比桥接更直观 |
 | **接口设计要稳** | Implementor 接口过窄要频繁改；过宽则实现类臃肿 |
 
-## 组装实践
+## 实践
 
 > **阅读提示**：先掌握「Abstraction 持有 PaymentBackend + refined 类型扩展格式 + 组装层自由组合」即可。本节是工程变体；初学可先跳过。
 

@@ -322,7 +322,7 @@ HTTP、MQ、CLI **统一** `order.Pay()`——**无 switch**。
 | **分散的迁移图** | 需 **文档/图** 汇总全局 FSM |
 | **与 DDD 聚合** | 大 Aggregate 上 State 要 **控边界** |
 
-## 组装实践
+## 实践
 
 > **阅读提示**：先掌握「**Order 委托 state.Pay，PaidState 内迁移**」即可。本节是工程变体；初学可先跳过。
 

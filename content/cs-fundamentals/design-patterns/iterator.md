@@ -48,7 +48,7 @@ type Closer interface {
 }
 ```
 
-若用 Go 1.23+ `iter.Seq[T]`，Aggregate 可返回 **`func(yield func(T) bool)`**，调用方 `for v := range seq`——语义等价，见 [组装实践](#组装实践)。
+若用 Go 1.23+ `iter.Seq[T]`，Aggregate 可返回 **`func(yield func(T) bool)`**，调用方 `for v := range seq`——语义等价，见 [实践](#实践)。
 
 ### 聚合（Aggregate）——订单明细
 
@@ -308,7 +308,7 @@ Client **只依赖** `Iterator[Order]`，不依赖 `[]Order`。
 | **错误处理** | `Next() (T, error)` 需区分 **Done vs 失败** |
 | **组合过滤 Iterator 链** | 多层装饰式 Iterator 调试时要 **命名清晰** |
 
-## 组装实践
+## 实践
 
 > **阅读提示**：先掌握「**Aggregate 提供 Iterator，Client 只 Next**」即可。本节是工程变体；初学可先跳过。
 

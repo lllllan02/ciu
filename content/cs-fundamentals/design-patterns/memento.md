@@ -236,7 +236,7 @@ func (s *EditSession) AutoSave(label string) {
 | **与 Command 边界** | 团队需约定 **何时快照 vs 何时命令** |
 | **Go 封装技巧** | 跨包 opaque 需 **接口 + 私有实现** 或 **[]byte** |
 
-## 组装实践
+## 实践
 
 > **阅读提示**：先掌握「**Originator Save/Restore，Caretaker 只存 opaque**」即可。本节是工程变体；初学可先跳过。
 
