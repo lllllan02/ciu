@@ -328,8 +328,5 @@ func (b BundleLine) ReserveInventory() error {
 
 ## 参考阅读
 
-- [x] [生成器模式](/cs-fundamentals/design-patterns/builder) — 分步构建订单，可与 Composite 组装明细树
-- [x] [桥接模式](/cs-fundamentals/design-patterns/bridge) — 支付维度拆分，与明细树结构正交
-- [x] [装饰器模式](/cs-fundamentals/design-patterns/decorator) — 单行可选增强，可与 Composite 子节点叠加
 - [x] [Refactoring.Guru - 组合模式](https://refactoringguru.cn/design-patterns/composite) (2026-06-22)
 - [x] [菜鸟教程 - 组合模式](https://www.runoob.com/design-pattern/composite-pattern.html) (2026-06-22)

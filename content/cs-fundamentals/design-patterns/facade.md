@@ -342,9 +342,5 @@ var _ OrderCheckout = CheckoutFacade{}
 
 ## 参考阅读
 
-- [x] [适配器模式](/cs-fundamentals/design-patterns/adapter) — 与外观的动机对比；子系统内常用适配器接第三方
-- [x] [组合模式](/cs-fundamentals/design-patterns/composite) — 明细树；Facade 委托 `lines` 给子系统遍历
-- [x] [装饰器模式](/cs-fundamentals/design-patterns/decorator) — 行级增强；与 Facade 正交
-- [x] [享元模式](/cs-fundamentals/design-patterns/flyweight) — SKU 元数据共享；与 Facade 正交
 - [x] [Refactoring.Guru - 外观模式](https://refactoringguru.cn/design-patterns/facade) (2026-06-22)
 - [x] [菜鸟教程 - 外观模式](https://www.runoob.com/design-pattern/facade-pattern.html) (2026-06-22)

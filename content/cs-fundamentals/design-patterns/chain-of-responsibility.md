@@ -419,8 +419,5 @@ func TestRefundChain_SkipsAutoForLarge(t *testing.T) {
 
 ## 参考阅读
 
-- [x] [外观模式](/cs-fundamentals/design-patterns/facade) — 多子系统编排；与前置责任链分层配合
-- [x] [装饰器模式](/cs-fundamentals/design-patterns/decorator) — 行级增强；与订单级责任链层次不同
-- [x] [代理模式](/cs-fundamentals/design-patterns/proxy) — 链环可注入带缓存/远程的库存代理
 - [x] [Refactoring.Guru - 责任链模式](https://refactoringguru.cn/design-patterns/chain-of-responsibility) (2026-06-22)
 - [x] [菜鸟教程 - 责任链模式](https://www.runoob.com/design-pattern/chain-of-responsibility-pattern.html) (2026-06-22)

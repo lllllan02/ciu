@@ -386,8 +386,5 @@ func TestMacroCommand_UndoReverseOrder(t *testing.T) {
 
 ## 参考阅读
 
-- [x] [外观模式](/cs-fundamentals/design-patterns/facade) — 用例级编排；与单步命令分层配合
-- [x] [责任链模式](/cs-fundamentals/design-patterns/chain-of-responsibility) — 前置校验链；与命令触发时机不同
-- [x] [工厂方法模式](/cs-fundamentals/design-patterns/factory) — 从持久化记录重建 ConcreteCommand
 - [x] [Refactoring.Guru - 命令模式](https://refactoringguru.cn/design-patterns/command) (2026-06-22)
 - [x] [菜鸟教程 - 命令模式](https://www.runoob.com/design-pattern/command-pattern.html) (2026-06-22)

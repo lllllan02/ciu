@@ -292,7 +292,5 @@ tmpl := NewInstallmentCheckoutAPI(sharedWeChatPay, cfg.AlertTemplate)
 
 ## 参考阅读
 
-- [x] [工厂方法模式](/cs-fundamentals/design-patterns/factory) — 电商订单系统与组装注入
-- [x] [适配器模式](/cs-fundamentals/design-patterns/adapter) — 支付后端集成与 `PaymentProcessor` 翻译
 - [x] [Refactoring.Guru - 桥接模式](https://refactoringguru.cn/design-patterns/bridge) (2026-06-18)
 - [x] [菜鸟教程 - 桥接模式](https://www.runoob.com/design-pattern/bridge-pattern.refund) (2026-06-18)

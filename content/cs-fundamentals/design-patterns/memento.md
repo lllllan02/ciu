@@ -372,9 +372,5 @@ func TestHistory_CannotMutateSnapshot(t *testing.T) {
 
 ## 参考阅读
 
-- [x] [命令模式](/cs-fundamentals/design-patterns/command) — 单步 Undo；与检查点备忘录组合
-- [x] [原型模式](/cs-fundamentals/design-patterns/prototype) — 复制新实例；与恢复同一对象对比
-- [x] [组合模式](/cs-fundamentals/design-patterns/composite) — 明细树深拷贝在 Originator
-- [x] [中介者模式](/cs-fundamentals/design-patterns/mediator) — Restore 后 Refresh 各面板
 - [x] [Refactoring.Guru - 备忘录模式](https://refactoringguru.cn/design-patterns/memento) (2026-06-22)
 - [x] [菜鸟教程 - 备忘录模式](https://www.runoob.com/design-pattern/memento-pattern.html) (2026-06-22)

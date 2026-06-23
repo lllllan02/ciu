@@ -360,10 +360,5 @@ func TestPricingEngine_UsesInjectedStrategy(t *testing.T) {
 
 ## 参考阅读
 
-- [x] [状态模式](/cs-fundamentals/design-patterns/state) — 生命周期行为；与可替换算法对比
-- [x] [装饰器模式](/cs-fundamentals/design-patterns/decorator) — 行级叠加；与整单策略分层
-- [x] [桥接模式](/cs-fundamentals/design-patterns/bridge) — 两维分离；非单维算法族
-- [x] [工厂方法模式](/cs-fundamentals/design-patterns/factory) — 创建 Processor；与选择 Strategy 配合
-- [x] [外观模式](/cs-fundamentals/design-patterns/facade) — PlaceOrder 内使用 PricingEngine
 - [x] [Refactoring.Guru - 策略模式](https://refactoringguru.cn/design-patterns/strategy) (2026-06-22)
 - [x] [菜鸟教程 - 策略模式](https://www.runoob.com/design-pattern/strategy-pattern.html) (2026-06-22)

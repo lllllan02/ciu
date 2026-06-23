@@ -282,6 +282,5 @@ type checkoutHub struct { /* 小写，包外无法 New */ }
 
 ## 参考阅读
 
-- [x] [原型模式](/cs-fundamentals/design-patterns/prototype) — 创建型模式前置，常与单例 hub 组合
 - [x] [Refactoring.Guru - 单例模式](https://refactoringguru.cn/design-patterns/singleton) (2026-06-17)
 - [x] [菜鸟教程 - 单例模式](https://www.runoob.com/design-pattern/singleton-pattern.html) (2026-06-17)

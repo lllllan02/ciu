@@ -282,6 +282,5 @@ func cloneViaJSON[T any](src T) (T, error) {
 
 ## 参考阅读
 
-- [x] [生成器模式](/cs-fundamentals/design-patterns/builder) — 创建型模式前置，常用于构建母版
 - [x] [Refactoring.Guru - 原型模式](https://refactoringguru.cn/design-patterns/prototype) (2026-06-17)
 - [x] [菜鸟教程 - 原型模式](https://www.runoob.com/design-pattern/prototype-pattern.html) (2026-06-17)

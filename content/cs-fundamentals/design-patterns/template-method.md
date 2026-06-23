@@ -377,9 +377,5 @@ func (b *B2BCheckout) PlaceOrder(ctx context.Context, req PlaceOrderRequest) (st
 
 ## 参考阅读
 
-- [x] [外观模式](/cs-fundamentals/design-patterns/facade) — 对外统一入口；内部可用模板
-- [x] [策略模式](/cs-fundamentals/design-patterns/strategy) — 骨架内计价；整段算法替换对比
-- [x] [责任链模式](/cs-fundamentals/design-patterns/chain-of-responsibility) — PrePlace 钩子内校验链
-- [x] [观察者模式](/cs-fundamentals/design-patterns/observer) — AfterPlace 发领域事件
 - [x] [Refactoring.Guru - 模板方法模式](https://refactoringguru.cn/design-patterns/template-method) (2026-06-22)
 - [x] [菜鸟教程 - 模板方法模式](https://www.runoob.com/design-pattern/template-method-pattern.html) (2026-06-22)

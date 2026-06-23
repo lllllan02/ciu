@@ -323,9 +323,5 @@ type FlyweightFactory[K comparable, F any] struct {
 
 ## 参考阅读
 
-- [x] [组合模式](/cs-fundamentals/design-patterns/composite) — 明细树；叶子可只持 SKU + Context
-- [x] [装饰器模式](/cs-fundamentals/design-patterns/decorator) — 行级增强；与享元正交
-- [x] [外观模式](/cs-fundamentals/design-patterns/facade) — 用例编排；不替代 SKU 元数据共享
-- [x] [单例模式](/cs-fundamentals/design-patterns/singleton) — 全局唯一 vs 每键享元
 - [x] [Refactoring.Guru - 享元模式](https://refactoringguru.cn/design-patterns/flyweight) (2026-06-22)
 - [x] [菜鸟教程 - 享元模式](https://www.runoob.com/design-pattern/flyweight-pattern.html) (2026-06-22)

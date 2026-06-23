@@ -420,9 +420,5 @@ func (r *recordingMediator) Notify(from ColleagueID, ev Event) error {
 
 ## 参考阅读
 
-- [x] [外观模式](/cs-fundamentals/design-patterns/facade) — 提交编排；与页内 Mediator 分层
-- [x] [责任链模式](/cs-fundamentals/design-patterns/chain-of-responsibility) — 服务端校验链；非页内联动
-- [x] [命令模式](/cs-fundamentals/design-patterns/command) — 可撤销改单；可与 Notify 配合
-- [x] [装饰器模式](/cs-fundamentals/design-patterns/decorator) — 行级计价；在 PricingEngine 内
 - [x] [Refactoring.Guru - 中介者模式](https://refactoringguru.cn/design-patterns/mediator) (2026-06-22)
 - [x] [菜鸟教程 - 中介者模式](https://www.runoob.com/design-pattern/mediator-pattern.html) (2026-06-22)

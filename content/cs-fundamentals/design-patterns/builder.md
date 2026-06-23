@@ -202,6 +202,5 @@ func OrderShipped(buyer, orderID string) (*Order, error) {
 
 ## 参考阅读
 
-- [x] [工厂方法模式](/cs-fundamentals/design-patterns/factory) — 创建型模式前置，与本文可组合使用
 - [x] [Refactoring.Guru - 生成器模式](https://refactoringguru.cn/design-patterns/builder) (2026-06-17)
 - [x] [菜鸟教程 - 建造者模式](https://www.runoob.com/design-pattern/builder-pattern.html) (2026-06-17)

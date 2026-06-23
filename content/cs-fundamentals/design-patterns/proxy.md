@@ -340,9 +340,5 @@ Java `InvocationHandler`、C# `DispatchProxy` 可 **运行时** 生成代理；G
 
 ## 参考阅读
 
-- [x] [装饰器模式](/cs-fundamentals/design-patterns/decorator) — 同接口增强；与代理可组合、勿混动机
-- [x] [外观模式](/cs-fundamentals/design-patterns/facade) — 多子系统编排；内部可注入带代理的 repo
-- [x] [适配器模式](/cs-fundamentals/design-patterns/adapter) — 接口转换；常与远程代理叠用
-- [x] [享元模式](/cs-fundamentals/design-patterns/flyweight) — 明细元数据共享；与虚拟代理懒加载 Lines 衔接
 - [x] [Refactoring.Guru - 代理模式](https://refactoringguru.cn/design-patterns/proxy) (2026-06-22)
 - [x] [菜鸟教程 - 代理模式](https://www.runoob.com/design-pattern/proxy-pattern.html) (2026-06-22)

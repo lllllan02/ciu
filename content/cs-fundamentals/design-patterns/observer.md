@@ -403,9 +403,5 @@ func (r *recordingObserver) Handle(_ context.Context, ev DomainEvent) error {
 
 ## 参考阅读
 
-- [x] [外观模式](/cs-fundamentals/design-patterns/facade) — 同步用例编排；与事后 Observer 分层
-- [x] [命令模式](/cs-fundamentals/design-patterns/command) — 写操作；Execute 后 Publish 事件
-- [x] [中介者模式](/cs-fundamentals/design-patterns/mediator) — 页内对等联动；非事后扇出
-- [x] [备忘录模式](/cs-fundamentals/design-patterns/memento) — 状态快照；与不可变领域事件对比
 - [x] [Refactoring.Guru - 观察者模式](https://refactoringguru.cn/design-patterns/observer) (2026-06-22)
 - [x] [菜鸟教程 - 观察者模式](https://www.runoob.com/design-pattern/observer-pattern.html) (2026-06-22)

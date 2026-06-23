@@ -253,6 +253,5 @@ type StripeAdapter struct {
 
 ## 参考阅读
 
-- [x] [工厂方法模式](/cs-fundamentals/design-patterns/factory) — 电商订单系统前置，`PaymentProcessor` 与组装注入
 - [x] [Refactoring.Guru - 适配器模式](https://refactoringguru.cn/design-patterns/adapter) (2026-06-18)
 - [x] [菜鸟教程 - 适配器模式](https://www.runoob.com/design-pattern/adapter-pattern.html) (2026-06-18)

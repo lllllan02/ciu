@@ -448,9 +448,5 @@ func TestPaidState_CrossBorderAdjustRejected(t *testing.T) {
 
 ## 参考阅读
 
-- [x] [观察者模式](/cs-fundamentals/design-patterns/observer) — 迁移后 Publish；与 State 分层
-- [x] [命令模式](/cs-fundamentals/design-patterns/command) — 操作封装；Execute 经 State 校验
-- [x] [外观模式](/cs-fundamentals/design-patterns/facade) — PlaceOrder 编排；与单订单状态机配合
-- [x] [责任链模式](/cs-fundamentals/design-patterns/chain-of-responsibility) — 下单前校验；非生命周期状态
 - [x] [Refactoring.Guru - 状态模式](https://refactoringguru.cn/design-patterns/state) (2026-06-22)
 - [x] [菜鸟教程 - 状态模式](https://www.runoob.com/design-pattern/state-pattern.html) (2026-06-22)

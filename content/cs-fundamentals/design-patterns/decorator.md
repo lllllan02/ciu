@@ -370,7 +370,5 @@ type InventoryHolder interface { ReserveInventory() error }
 
 ## 参考阅读
 
-- [x] [组合模式](/cs-fundamentals/design-patterns/composite) — 明细树与装饰器可叠加在行节点上
-- [x] [桥接模式](/cs-fundamentals/design-patterns/bridge) — 支付维度拆分，与行级装饰正交
 - [x] [Refactoring.Guru - 装饰器模式](https://refactoringguru.cn/design-patterns/decorator) (2026-06-22)
 - [x] [菜鸟教程 - 装饰器模式](https://www.runoob.com/design-pattern/decorator-pattern.html) (2026-06-22)

@@ -467,8 +467,5 @@ func TestFilteredOrderIterator_Pagination(t *testing.T) {
 
 ## 参考阅读
 
-- [x] [组合模式](/cs-fundamentals/design-patterns/composite) — 订单明细树；与扁平 Iterator 配合
-- [x] [命令模式](/cs-fundamentals/design-patterns/command) — 对 Iterator 元素批量入队执行
-- [x] [外观模式](/cs-fundamentals/design-patterns/facade) — 用例编排；内部可用 Iterator 扇出索引
 - [x] [Refactoring.Guru - 迭代器模式](https://refactoringguru.cn/design-patterns/iterator) (2026-06-22)
 - [x] [菜鸟教程 - 迭代器模式](https://www.runoob.com/design-pattern/iterator-pattern.html) (2026-06-22)

@@ -326,9 +326,5 @@ func TestPickListExporter_BundleRecurses(t *testing.T) {
 
 ## 参考阅读
 
-- [x] [组合模式](/cs-fundamentals/design-patterns/composite) — 明细树；接口膨胀时引入 Visitor
-- [x] [迭代器模式](/cs-fundamentals/design-patterns/iterator) — 扁平遍历；与分类型操作对比
-- [x] [装饰器模式](/cs-fundamentals/design-patterns/decorator) — 行级增强；Accept 委托 inner
-- [x] [策略模式](/cs-fundamentals/design-patterns/strategy) — 单算法替换；非操作矩阵
 - [x] [Refactoring.Guru - 访问者模式](https://refactoringguru.cn/design-patterns/visitor) (2026-06-22)
 - [x] [菜鸟教程 - 访问者模式](https://www.runoob.com/design-pattern/visitor-pattern.html) (2026-06-22)

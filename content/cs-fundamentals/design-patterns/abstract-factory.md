@@ -195,6 +195,5 @@ cross_borderSvc := NewService(NewCrossBorderCheckoutSuite())
 
 ## 参考阅读
 
-- [x] [工厂方法模式](/cs-fundamentals/design-patterns/factory) — 本文前置阅读，单产品创建
 - [x] [Refactoring.Guru - 抽象工厂模式](https://refactoringguru.cn/design-patterns/abstract-factory) (2026-06-17)
 - [x] [菜鸟教程 - 抽象工厂模式](https://www.runoob.com/design-pattern/abstract-factory-pattern.html) (2026-06-17)
