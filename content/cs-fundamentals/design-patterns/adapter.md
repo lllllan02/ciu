@@ -3,7 +3,7 @@ title: 适配器模式
 order: 6
 ---
 
-**适配器模式** 将一个类的接口转换成客户希望的另一个接口，使原本因接口不兼容而不能一起工作的类可以一起工作。
+**适配器模式** 亦称 **封装器模式**（Wrapper）、**Adapter**，将一个类的接口转换成客户希望的另一个接口，使原本因接口不兼容而不能一起工作的类可以一起工作。
 
 通俗地说，在两套对不上的接口之间插一层「翻译」：对外符合你期望的样子，对内再去调现有组件；第三方或遗留代码不动，业务侧接口也不改，两边就能对接。
 
@@ -187,7 +187,7 @@ func (a *StripeAdapter) Pay(order Order) error {
 ## 关联
 
 - [桥接模式](/cs-fundamentals/design-patterns/bridge) 通常在开发前期就设计好，用来把程序拆成可独立演进的两部分；[适配器模式](/cs-fundamentals/design-patterns/adapter) 则多用于已有代码，让原本不兼容的类能一起工作。
-- [适配器模式](/cs-fundamentals/design-patterns/adapter) 会 **改写** 现有对象的接口；[装饰模式](/cs-fundamentals/design-patterns/decorator) 在 **不改接口** 的前提下增强对象行为，且支持递归组合——适配器不支持这一点。
+- [适配器模式](/cs-fundamentals/design-patterns/adapter) 在外层 **实现 Client 期望的另一套接口**，对内包装原对象并翻译调用——被适配者的原接口不动；[装饰模式](/cs-fundamentals/design-patterns/decorator) **沿用与被包装对象相同的接口**，在委托前后增强行为，且支持递归组合——适配器不支持这种同接口叠层。
 - 从接口形态看：[适配器](/cs-fundamentals/design-patterns/adapter) 提供 **不同的** 接口；[代理模式](/cs-fundamentals/design-patterns/proxy) 提供 **相同的** 接口；[装饰模式](/cs-fundamentals/design-patterns/decorator) 提供 **增强后的** 接口。
 - [外观模式](/cs-fundamentals/design-patterns/facade) 为现有对象 **定义新接口**；适配器则尽量 **复用已有接口**。适配器通常只包装 **一个** 对象，外观往往面向 **整个子系统**。
 - [桥接模式](/cs-fundamentals/design-patterns/bridge)、[状态模式](/cs-fundamentals/design-patterns/state)、[策略模式](/cs-fundamentals/design-patterns/strategy)（以及在一定程度上适配器）的接口结构很相似——都基于 [组合模式](/cs-fundamentals/design-patterns/composite) 式的委托，但各自要解决的问题不同。模式不仅是代码组织方式，也是与同伴讨论 **如何解题** 的共同语言。

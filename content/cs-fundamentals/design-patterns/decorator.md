@@ -3,7 +3,7 @@ title: 装饰器模式
 order: 9
 ---
 
-**装饰器模式** 动态地给一个对象添加一些额外的职责；就增加功能来说，装饰器模式比生成子类更为灵活。
+**装饰器模式** 亦称 **装饰模式**、**装饰者模式**、**Wrapper**、**Decorator**，动态地给一个对象添加一些额外的职责；就增加功能来说，装饰器模式比生成子类更为灵活。
 
 通俗地说，给对象叠加额外能力时，一层层包上去即可，每层只多干一件事；需要哪些增强、叠几层，运行时按需组合，不必为每一种组合预先写子类。
 
@@ -231,30 +231,6 @@ _ = svc.Checkout()
 
 ## 实践
 
-> **阅读提示**：先掌握「`OrderLine` + 持有 `inner` 的装饰器 + 组装层套娃」即可。本节是工程变体；初学可先跳过。
-
-### 与组合叠加
-
-套餐子行可以是「带装饰的单品」：
-
-```go
-giftBox := BundleLine{
-    BundleID: "gift-2026",
-    Children: []OrderLine{
-        GiftWrapLine{
-            Fee: 500,
-            Inner: CouponLine{
-                Off: 800,
-                Inner: ProductLine{SKU: "tea-001", Quantity: 1, UnitPrice: 8800},
-            },
-        },
-        ProductLine{SKU: "cup-002", Quantity: 1, UnitPrice: 3200},
-    },
-}
-```
-
-组合管 **树怎么遍历**；装饰器管 **某一节点上的增强**。`BundleLine.Total()` 仍递归 `child.Total()`，不关心 child 是裸 `ProductLine` 还是三层包装。
-
 ### 支付侧的同类用法
 
 对 `PaymentProcessor` 做重试、日志，结构与订单行装饰相同：
@@ -308,39 +284,6 @@ func (f pricedFunc) Total() int64 { return f() }
 
 完整 `OrderLine` 三个方法时，struct 装饰器通常 **更清晰**；仅 `Total()` 可变时函数式更轻。
 
-### 顺序与可交换性
-
-文档化 **组装顺序** 或在装饰器内声明优先级：
-
-```go
-// 约定：先会员折扣 → 再优惠券 → 最后礼品包装费（费用不参与折扣）
-func DecorateLine(base OrderLine, cfg LineConfig) OrderLine {
-    line := base
-    if cfg.MemberDiscountBP > 0 {
-        line = MemberDiscountLine{Inner: line, DiscountBP: cfg.MemberDiscountBP}
-    }
-    if cfg.CouponOff > 0 {
-        line = CouponLine{Inner: line, Off: cfg.CouponOff}
-    }
-    if cfg.GiftWrap {
-        line = GiftWrapLine{Inner: line, Fee: 500}
-    }
-    return line
-}
-```
-
-复杂满减（跨行、满 300 减 50）不适合单行装饰器——放在 `CheckoutService` 或 **价格引擎** 统一算，单行装饰只处理 **行内** 逻辑。
-
-### 与策略的区别
-
-| | 装饰器 | 策略 |
-| :--- | :--- | :--- |
-| 意图 | **叠加** 多层行为，对外仍是一个 Component | **替换** 一种算法 |
-| 结构 | 链式包装，每层都委托 inner | Context 持有一个 Strategy，通常 **互斥** |
-| 例子 | 会员折 + 券 + 包装费层层套 | 「用平台券算法还是店铺券算法」二选一 |
-
-若促销规则 **互斥**（只能用一种券），用策略；若 **可叠加**，用装饰器或显式 **价格管道**（pipeline）。
-
 ### 拆接口减轻转发负担
 
 当只有部分装饰器关心 `ReserveInventory`，可拆小接口：
@@ -353,20 +296,18 @@ type InventoryHolder interface { ReserveInventory() error }
 
 装饰器只实现它改动的接口；`CheckoutService` 用类型断言或辅助函数组合约束。小项目 **3～5 个方法** 全转发即可。
 
-### 透明性：装饰器是否暴露 inner
+## 关联
 
-多数场景 **不暴露** `inner`，客户端只认最外层 `OrderLine`。若运营要「展示原价与实付」，可加 **可选** 方法或单独 `PriceBreakdown(line OrderLine)` 遍历装饰链——Go 可用 type switch 或 `interface{ Unwrap() OrderLine }` 约定。
-
-## 小结
-
-记住这四点即可：
-
-1. **同一接口上可叠加增强 → 装饰器**：持有 `inner`，先委托再增强，避免 `2^N` 子类。
-2. **组装层套娃、Client 不变**：`CheckoutService` 仍只调 `line.Total()`，顺序在组装函数里约定。
-3. **与组合正交**：组合是树 **包含** 子行；装饰是 **包装** 单行；child 可以是装饰过的 `ProductLine`。
-4. **别滥用**：跨行满减、复杂促销引擎不属于单行装饰；接口越来越胖时拆小接口或管道化。
-
-[组合模式](/cs-fundamentals/design-patterns/composite) 统一了 **订单明细树** 的遍历；装饰器模式统一了 **单行上的可选增强** 如何动态组合。下一篇 [外观模式](/cs-fundamentals/design-patterns/facade) 关注 **下单用例** 如何穿过库存、支付、通知等子系统而不让每个入口重复编排。
+- [适配器模式](/cs-fundamentals/design-patterns/adapter) 在外层 **实现 Client 期望的另一套接口**，对内包装原对象并翻译调用——被适配者的原接口不动；装饰模式 **沿用与被包装对象相同的接口**，在委托前后增强行为，且支持递归组合——适配器不支持这种同接口叠层。
+- 从接口形态看：[适配器](/cs-fundamentals/design-patterns/adapter) 提供 **不同的** 接口；[代理模式](/cs-fundamentals/design-patterns/proxy) 提供 **相同的** 接口；装饰模式提供 **增强后的** 接口——仍是 `OrderLine`，只是在委托前后追加行为。
+- 装饰模式与 [代理模式](/cs-fundamentals/design-patterns/proxy) 结构很像，但意图不同：代理关心 **能否 / 何时触达** 真实对象，常自行管理 Service 的生命周期；装饰器的创建 **始终由 Client / 组装层控制**，只关心触达后 **多做什么**。
+- [责任链模式](/cs-fundamentals/design-patterns/chain-of-responsibility) 与装饰模式都靠递归组合传递调用，但责任链的处理者 **可独立决定是否继续传递**，甚至在某环终止；装饰器 **必须** 沿 `inner` 委托到底，不能截断请求。
+- [组合模式](/cs-fundamentals/design-patterns/composite) 与装饰模式的结构图很像——都靠递归组合组织对象；差别在于装饰器通常 **只有一个** 子组件，且 **增强** 被包装对象的行为，而组合体对子节点 **求和 / 聚合**。二者可叠加：用装饰器扩展组合树中 **某个** 明细节点的行为。
+- [组合模式](/cs-fundamentals/design-patterns/composite) 统一了 **订单明细树** 的遍历；装饰器模式统一了 **单行上的可选增强** 如何动态组合。
+- 大量使用组合和装饰的设计，通常可从 [原型模式](/cs-fundamentals/design-patterns/prototype) 中获益——克隆复杂结构，而非从零重新构造。
+- 装饰模式改变对象的 **「皮肤」**（`Total()` 前后叠加折扣、包装费）；[策略模式](/cs-fundamentals/design-patterns/strategy) 改变对象的 **「内脏」**——例如把「怎么算运费」抽成可替换的 `ShippingStrategy`。
+- 可与 [桥接模式](/cs-fundamentals/design-patterns/bridge) 叠加：桥接拆 **控制维 × 平台维**，装饰器在同一接口上叠 **横切增强**（重试、审计、优惠券）。
+- [外观模式](/cs-fundamentals/design-patterns/facade) 编排 **跨子系统的下单用例**；装饰器只管 **单行 `OrderLine` 上的可选增强**——Client 调 Facade 下单，组装层再给明细套上会员价、优惠券等装饰。
 
 ## 参考阅读
 
