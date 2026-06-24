@@ -191,8 +191,6 @@ func submitBundleReorder(reg *OrderTemplateRegistry, buyer, sku string) error {
 
 ## 实践
 
-> **阅读提示**：先掌握「`Clone()` + 改差异字段」即可。本节是 Go 项目里的实现细节；初学可先跳过。
-
 ### 深拷贝与浅拷贝
 
 | 字段类型 | 赋值 `b = a` | 安全 `Clone` 常见做法 |
@@ -230,55 +228,15 @@ func (r *OrderTemplateRegistry) Clone(name string) (OrderPrototype, error) {
 
 若运营要「热更新订单模板」，用 **替换注册表条目**（新 `Build()` 后 `Register`），而不是原地改已注册 struct 的字段。
 
-### 与生成器组合
+## 关联
 
-[生成器](/cs-fundamentals/design-patterns/builder) 适合 **启动时** 拼出复杂母版；[原型](/cs-fundamentals/design-patterns/prototype) 适合 **运行时** 复制：
-
-```go
-// 启动：生成器 → 注册原型
-mother, _ := NewOrderBuilder().
-    Name("…").AddItem("sku-1001", 1).PaymentMethod("alipay").Build()
-reg.Register("starter_bundle", mother)
-
-// 运行时：克隆 → 填差异
-p, _ := reg.Clone("starter_bundle")
-_ = p.SubmitClone("user@example.com", nil)
-```
-
-不必二选一：母版用 Builder，副本用 Prototype。
-
-### 与工厂方法的区别
-
-[工厂方法](/cs-fundamentals/design-patterns/factory) 回答 **「造哪一种 PaymentProcessor」**；原型回答 **「从哪份已有 OrderTemplate 母版复制」**。支付渠道选型仍在组装层 `NewAlipayProcessor()`；订单模板复制在业务提交路径 `Clone("bundle_reorder")`。
-
-### `json.Marshal` / `Unmarshal` 当克隆？
-
-偶尔用于 **快速深拷贝 DTO**（结构简单、无 `time.Time` 精度等特殊需求）：
-
-```go
-func cloneViaJSON[T any](src T) (T, error) {
-    var dst T
-    b, err := json.Marshal(src)
-    if err != nil {
-        return dst, err
-    }
-    err = json.Unmarshal(b, &dst)
-    return dst, err
-}
-```
-
-生产路径更推荐 **显式 `Clone()`**：性能可预期、类型安全、不依赖 JSON tag。原型模式的价值正在于 **把拷贝规则写在类型旁边**，而不是藏在一行魔法序列化里。
-
-## 小结
-
-记住这四点即可：
-
-1. **已有「对的」实例、且复制比重建划算 → 考虑原型**：`Clone()` 封装深拷贝，提交侧只改差异字段。
-2. **母版只构建一次、注册后视为只读**：避免污染注册表里的原型。
-3. **与工厂 / 生成器分工不同**：工厂选型、生成器拼母版、原型在运行时复制母版。
-4. **Go 无内置克隆**：`Clone()` 的质量决定模式是否成立；切片、map、指针要逐项处理。
-
-上一篇的 [生成器模式](/cs-fundamentals/design-patterns/builder) 管 **单个复杂对象分步构建**；本篇管 **从已有实例安全复制**。字段从零拼 → 生成器；同一订单模板提交一千次 → 原型。克隆出的订单最终还要交给统一基础设施发出去；下一篇 [单例模式](/cs-fundamentals/design-patterns/singleton) 讨论 **结算中心、限流器、连接池为何可能需要进程内唯一**。
+- 许多设计在初期会先用 [工厂方法模式](/cs-fundamentals/design-patterns/factory)（较简单，也便于通过子类定制），随后再演化为 [抽象工厂模式](/cs-fundamentals/design-patterns/abstract-factory)原型模式或 [生成器模式](/cs-fundamentals/design-patterns/builder)（更灵活，也更复杂）。
+- [抽象工厂模式](/cs-fundamentals/design-patterns/abstract-factory) 通常基于一组工厂方法，但你也可以使用原型模式来生成这些产品。
+- 原型模式可用于保存 [命令模式](/cs-fundamentals/design-patterns/command) 的历史记录。
+- 大量使用 [组合模式](/cs-fundamentals/design-patterns/composite) 和 [装饰模式](/cs-fundamentals/design-patterns/decorator) 的设计通常可从原型的使用中获益——你可以通过该模式来复制复杂结构，而非从零开始重新构造。
+- 原型并不基于继承，因此没有继承的缺点；另一方面，原型需要对被复制对象进行复杂的初始化。[工厂方法模式](/cs-fundamentals/design-patterns/factory) 基于继承，但不需要这些初始化步骤。
+- 有时候原型模式可以作为 [备忘录模式](/cs-fundamentals/design-patterns/memento) 的简化版本——条件是你要在历史记录中存储的对象状态比较简单，不需要链接其他外部资源，或者链接可以方便地重建。
+- [抽象工厂模式](/cs-fundamentals/design-patterns/abstract-factory)、[生成器模式](/cs-fundamentals/design-patterns/builder) 和原型模式都可以用 [单例模式](/cs-fundamentals/design-patterns/singleton) 来实现。
 
 ## 参考阅读
 

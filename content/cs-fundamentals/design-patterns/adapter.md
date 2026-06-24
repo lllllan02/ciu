@@ -151,29 +151,6 @@ stripeSvc := &Service{
 
 ## 实践
 
-> **阅读提示**：先掌握「Adapter 实现 `PaymentProcessor` + 持有 Adaptee + 组装注入」即可。本节是工程中的常见变体；初学可先跳过。
-
-### 配置在组装层注入
-
-支付账号、客户 ID、币种等 **支付渠道级配置** 应在 `main` 或 `NewServiceFromConfig` 里传给 Adapter，不要写死在 Adapter 内部：
-
-```go
-func NewServiceFromConfig(cfg Config) (*Service, error) {
-    var processor PaymentProcessor
-    switch cfg.PaymentProvider {
-    case "legacy_bank":
-        processor = NewLegacyBankAdapter(LegacyBankClient{}, cfg.BankAccount)
-    case "stripe":
-        processor = NewStripeAdapter(StripeClient{}, cfg.StripeCustomerID)
-    default:
-        return nil, fmt.Errorf("unknown payment provider: %q", cfg.PaymentProvider)
-    }
-    return &Service{processor: processor}, nil
-}
-```
-
-这与 [工厂方法 · 按配置注入产品](/cs-fundamentals/design-patterns/factory#按配置注入产品) 相同：**选型 + 构造** 留在组装层；`Service` 仍只调 `Pay`。
-
 ### 适配器持有接口还是具体类型
 
 Adaptee 若能抽象成小型接口，Adapter 依赖 **接口** 更利于测试：
@@ -207,49 +184,13 @@ func (a *StripeAdapter) Pay(order Order) error {
 
 避免把 SDK 特有类型泄漏到 `Service`；必要时在 Adapter 层打日志、重试、指标打点。
 
-### 与外观的区别
+## 关联
 
-| | 适配器 | 外观（Facade） |
-| :--- | :--- | :--- |
-| 目的 | 让 **现有** 接口符合 **客户端已定的** Target | **简化** 多个子系统，提供新的粗粒度入口 |
-| 接口 | 必须实现 Client 已有的 Target（如 `PaymentProcessor`） | 常定义全新 API（如 `CheckoutOrder(req)`） |
-| 典型场景 | Stripe SDK → `PaymentProcessor` | 支付 + 库存 + 发票 + 审计日志 → 一个 `CheckoutFacade`（见 [外观模式](/cs-fundamentals/design-patterns/facade)） |
-
-一个类可以同时「像适配器又像外观」——判断时看 **动机**：是为 **兼容旧接口**，还是为 **降低子系统使用复杂度**。
-
-### 与装饰器的区别
-
-| | 适配器 | 装饰器（Decorator） |
-| :--- | :--- | :--- |
-| 接口 | Target 与 Adaptee **不同**，需要翻译 | 装饰器与组件 **同一接口** |
-| 目的 | 让不能协作的类能协作 | 在不改原对象前提下 **增强行为**（重试、日志） |
-| 例子 | `StripeAdapter` 把 `CreatePayment` 变成 `Pay` | `RetryPaymentProcessor` 包装任意 `PaymentProcessor` 并在 `Pay` 里重试 |
-
-二者可 **叠加**：`Service` 注入 `RetryPaymentProcessor{inner: NewStripeAdapter(...)}`。
-
-### 指针接收者与 Adaptee 生命周期
-
-Adaptee 若是有状态客户端（连接池、HTTP Client），Adapter 应 **持有指针**，并在 `NewXxxAdapter` 里注入 **共享实例** 或 **每服务一个实例**，与工厂方法里产品的生命周期策略一致：
-
-```go
-type StripeAdapter struct {
-    client *StripeClient // 共享连接
-    customerID string
-}
-```
-
-避免每个 `Pay` 临时 `new` 重量级 SDK 客户端。
-
-## 小结
-
-记住这四点即可：
-
-1. **接口对不上、又改不了 Adaptee → 用适配器**：实现 Target，持有 Adaptee，在 Target 方法里翻译调用。
-2. **Client 只依赖 Target**：`Service` 继续用 `PaymentProcessor.Pay`，不出现 `ChargeCard` / `CreatePayment`。
-3. **与工厂方法组合**：组装层 `NewLegacyBankAdapter(...)` 注入 `Service`；选型与翻译分层清晰。
-4. **Go 只有对象适配器**：struct 组合 Adaptee；别与外观、装饰器混淆——适配器解决 **接口兼容**，不是简化子系统或增强行为。
-
-创建型模式解决 **怎么造对象**；结构型模式解决 **类与类如何拼在一起**。本篇是结构型的第一篇：**把现成的、接口不合的组件接进你的抽象里**。当接口已经能接上，但支付请求形态和支付后端都要独立扩展时，就进入下一篇 [桥接模式](/cs-fundamentals/design-patterns/bridge)。
+- [桥接模式](/cs-fundamentals/design-patterns/bridge) 通常在开发前期就设计好，用来把程序拆成可独立演进的两部分；[适配器模式](/cs-fundamentals/design-patterns/adapter) 则多用于已有代码，让原本不兼容的类能一起工作。
+- [适配器模式](/cs-fundamentals/design-patterns/adapter) 会 **改写** 现有对象的接口；[装饰模式](/cs-fundamentals/design-patterns/decorator) 在 **不改接口** 的前提下增强对象行为，且支持递归组合——适配器不支持这一点。
+- 从接口形态看：[适配器](/cs-fundamentals/design-patterns/adapter) 提供 **不同的** 接口；[代理模式](/cs-fundamentals/design-patterns/proxy) 提供 **相同的** 接口；[装饰模式](/cs-fundamentals/design-patterns/decorator) 提供 **增强后的** 接口。
+- [外观模式](/cs-fundamentals/design-patterns/facade) 为现有对象 **定义新接口**；适配器则尽量 **复用已有接口**。适配器通常只包装 **一个** 对象，外观往往面向 **整个子系统**。
+- [桥接模式](/cs-fundamentals/design-patterns/bridge)、[状态模式](/cs-fundamentals/design-patterns/state)、[策略模式](/cs-fundamentals/design-patterns/strategy)（以及在一定程度上适配器）的接口结构很相似——都基于 [组合模式](/cs-fundamentals/design-patterns/composite) 式的委托，但各自要解决的问题不同。模式不仅是代码组织方式，也是与同伴讨论 **如何解题** 的共同语言。
 
 ## 参考阅读
 

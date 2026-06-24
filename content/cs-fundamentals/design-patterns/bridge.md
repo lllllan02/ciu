@@ -5,7 +5,7 @@ order: 7
 
 **桥接模式** 将抽象部分与实现部分分离，使它们都可以独立地变化。
 
-通俗地说，两个本来会各自扩展的维度拆开——上面的用法和下面的实现各管各的，再用组合接在一起；新增一种用法或换一种实现，都不必为每一种搭配单独写一个类。
+通俗地说，两个本来会各自扩展的维度拆开，再用组合接在一起；新增一种形态或换一种后端，都不必为每一种搭配单独写一个类。GoF 里的「抽象部分 / 实现部分」**不是**日常说的「抽象类 vs 具体类」——下文会专门说明。
 
 ## 问题
 
@@ -31,16 +31,23 @@ type WeChatInstallmentProcessor struct{}
 
 ## 解决方案
 
-下文按 **模式角色** 命名，避免和日常用语混淆：
+两个维度拆开：**形态**（直接 / 分期 / 退款）管怎么组织请求，**后端**（支付宝 / 微信 / Stripe）管怎么调网关。组装层把两者配对后，业务层只依赖 `CheckoutSender`。
 
-| 角色 | 本文类型名 | 为何不用别的叫法 |
-| :--- | :--- | :--- |
-| 抽象部分 | `CheckoutAPI`、`InstallmentCheckoutAPI` | 强调 **调用方入口**，不是 `PaymentProcessor` 那种「听起来包办支付」的名字 |
-| 实现部分 | `PaymentBackend`、`AlipayBackend` | 强调 **底层支付**，不叫 `PaymentChannel`——「Channel」在电商订单系统里通常指支付宝/微信支付等 **业务支付后端**，易和 Implementor 接口混淆 |
+### 三个角色：别和「抽象类」混淆
 
-把 **底层怎么支付** 抽成 `PaymentBackend`（Implementor），把 **调用方怎么提交** 放在 `CheckoutAPI` 及其 refined 类型（Abstraction，Go 里用 **嵌入** 扩展，不是继承子类）；`Checkout` 处理完本层逻辑后，委托 `backend.Charge(...)`。
+GoF 的 **Abstraction / Implementor** 指 **两个独立变化的维度**，不是「抽象类 vs 具体类」。划分看 **委托方向**：形态侧持有 `PaymentBackend` 并调 `Charge`；后端侧被委托调网关；`main` 里配对两维的是 **Client（组装层）**，不是第三条变化维。
 
-### 实现部分（Implementor）
+| GoF | 本文 | 类型 | 职责 |
+| :--- | :--- | :--- | :--- |
+| **Abstraction** | 控制维（形态） | `CheckoutSender` 及其实现 | 格式化 `request`，委托 `Charge` |
+| **Implementor** | 平台维（后端） | `PaymentBackend` 及其实现 | 接收 `request`，调网关 |
+| **Client** | 组装层 | `NewCheckoutStack` 等 | 形态 × 后端配对 |
+
+**怎么认**：扩展时 **会调另一维** → 控制维（如新增分期仍调 `Charge`）；**只接收另一维输出** → 平台维（如新增 Stripe）；**只换配对** → 组装层。
+
+3 种形态 × 3 种后端 = 9 种配对，只需 **3 + 3 = 6** 个类型。
+
+### 平台维（Implementor）：支付后端
 
 ```go
 type PaymentBackend interface {
@@ -57,98 +64,109 @@ func (b AlipayBackend) Charge(orderID, request string) error {
 }
 
 type WeChatPayBackend struct {
+    appID  string
     client WeChatPayClient
 }
 
 func (b WeChatPayBackend) Charge(orderID, request string) error {
-    _, err := b.client.CreatePayment(orderID, parseAmount(request))
-    return err
+    return b.client.UnifiedOrder(b.appID, orderID, parseAmount(request))
 }
 
 type StripeBackend struct {
-    client StripeClient
+    customerID string
+    client     StripeClient
 }
 
 func (b StripeBackend) Charge(orderID, request string) error {
-    _, err := b.client.CreatePayment(orderID, parseAmount(request))
-    return err
+    return b.client.ChargeCustomer(b.customerID, orderID, parseAmount(request))
 }
 ```
 
-### 抽象部分（Abstraction）
+### 控制维（Abstraction）：支付形态
+
+三种形态 **共用 `CheckoutSender` 接口**；每种形态 **持有** 一个 `PaymentBackend`，在 `Submit` 里格式化后 **委托** `Charge`：
 
 ```go
+type CheckoutInput struct {
+    Amount  int64
+    Periods int    // 分期用
+    Reason  string // 退款用
+}
+
+type CheckoutSender interface {
+    Submit(orderID string, in CheckoutInput) error
+}
+
 type CheckoutAPI struct {
     backend PaymentBackend
 }
 
-func NewCheckoutAPI(backend PaymentBackend) CheckoutAPI {
+func NewCheckoutAPI(backend PaymentBackend) CheckoutSender {
     return CheckoutAPI{backend: backend}
 }
 
-func (api CheckoutAPI) Checkout(orderID, request string) error {
+func (api CheckoutAPI) Submit(orderID string, in CheckoutInput) error {
+    request := fmt.Sprintf("amount=%d", in.Amount)
+    return api.backend.Charge(orderID, request)
+}
+
+type InstallmentCheckoutAPI struct {
+    backend PaymentBackend
+    tmpl    string
+}
+
+func NewInstallmentCheckoutAPI(backend PaymentBackend, tmpl string) CheckoutSender {
+    return InstallmentCheckoutAPI{backend: backend, tmpl: tmpl}
+}
+
+func (api InstallmentCheckoutAPI) Submit(orderID string, in CheckoutInput) error {
+    request := buildInstallmentRequest(api.tmpl, orderID, in.Periods, in.Amount)
+    return api.backend.Charge(orderID, request)
+}
+
+type RefundCheckoutAPI struct {
+    backend PaymentBackend
+}
+
+func NewRefundCheckoutAPI(backend PaymentBackend) CheckoutSender {
+    return RefundCheckoutAPI{backend: backend}
+}
+
+func (api RefundCheckoutAPI) Submit(orderID string, in CheckoutInput) error {
+    request := buildRefundRequest(in.Reason, in.Amount)
     return api.backend.Charge(orderID, request)
 }
 ```
 
-### refined 抽象部分（Refined Abstraction）
+### 组装层（Client）与业务层
 
-```go
-type InstallmentCheckoutAPI struct {
-    CheckoutAPI
-    installment string
-}
-
-func NewInstallmentCheckoutAPI(backend PaymentBackend, tmpl string) InstallmentCheckoutAPI {
-    return InstallmentCheckoutAPI{
-        CheckoutAPI:  NewCheckoutAPI(backend),
-        installment: tmpl,
-    }
-}
-
-func (api InstallmentCheckoutAPI) CheckoutWithVars(orderID string, vars map[string]string) error {
-    request := buildInstallmentRequest(api.installment, vars)
-    return api.CheckoutAPI.Checkout(orderID, request)
-}
-
-type RefundCheckoutAPI struct {
-    CheckoutAPI
-}
-
-func NewRefundCheckoutAPI(backend PaymentBackend) RefundCheckoutAPI {
-    return RefundCheckoutAPI{CheckoutAPI: NewCheckoutAPI(backend)}
-}
-
-func (api RefundCheckoutAPI) Refund(orderID, refundReason string) error {
-    request := buildRefundRequest(refundReason)
-    return api.CheckoutAPI.Checkout(orderID, request)
-}
-```
-
-### 客户端与组装
+`CheckoutService` 是 **Client**：只消费组装好的 `CheckoutSender`，不参与扩展形态或后端。配对发生在注入之前：
 
 ```go
 type CheckoutService struct {
-    sender interface {
-        Checkout(orderID, request string) error
-    }
+    sender CheckoutSender
 }
 
-func (svc *CheckoutService) CheckoutDirect(orderID, request string) error {
-    return svc.sender.Checkout(orderID, request)
+func (svc *CheckoutService) Pay(orderID string, in CheckoutInput) error {
+    return svc.sender.Submit(orderID, in)
 }
 
-// 组装层：任意「抽象 × 实现」组合，不必新建组合类
-alipayDirect := NewCheckoutAPI(AlipayBackend{bank: LegacyBankClient{}, account: "merchant-001"})
-wechatInstallment := NewInstallmentCheckoutAPI(WeChatPayBackend{client: WeChatPayClient{}}, "order={{.OrderID}}, periods={{.Periods}}")
-stripeRefund := NewRefundCheckoutAPI(StripeBackend{client: StripeClient{}})
+// Client：形态 × 后端配对，再注入 CheckoutService
+alipay := AlipayBackend{bank: legacyBank, account: "merchant-001"}
+wechat := WeChatPayBackend{appID: "wx-app", client: wechatClient}
+stripe := StripeBackend{customerID: "cus_xxx", client: stripeClient}
 
-svc := &CheckoutService{sender: alipayDirect}
-_ = wechatInstallment.CheckoutWithVars("order-001", map[string]string{"OrderID": "order-001", "Periods": "3"})
-_ = stripeRefund.Refund("order-001", "用户取消订单")
+// 直接 × 支付宝 | 分期 × 微信 | 退款 × Stripe —— 不必为每种组合写新类
+svcDirectAlipay      := &CheckoutService{sender: NewCheckoutAPI(alipay)}
+svcInstallmentWechat := &CheckoutService{sender: NewInstallmentCheckoutAPI(wechat, "periods={{.Periods}}")}
+svcRefundStripe      := &CheckoutService{sender: NewRefundCheckoutAPI(stripe)}
+
+_ = svcDirectAlipay.Pay("order-001", CheckoutInput{Amount: 9900})
+_ = svcInstallmentWechat.Pay("order-002", CheckoutInput{Amount: 9900, Periods: 3})
+_ = svcRefundStripe.Pay("order-003", CheckoutInput{Amount: 9900, Reason: "用户取消"})
 ```
 
-新增 **支付后端** → 只加 `PaymentBackend` 实现；新增 **支付请求形态** → 只加 refined `CheckoutAPI`；**不必** 为每种组合写 `AlipayRefundPaymentProcessor`。
+新增 **支付后端** → 只加 `PaymentBackend` 实现（平台维）；新增 **支付形态** → 只加一种 `CheckoutSender` 实现（控制维）；**换配对** → 只改组装层，不必写 `AlipayRefundProcessor`。
 
 
 ## 适用场景
@@ -156,8 +174,8 @@ _ = stripeRefund.Refund("order-001", "用户取消订单")
 1. **两个维度独立变化**：支付请求形态 × 支付后端、UI 控件 × 渲染后端（矢量/光栅）、业务 API × 存储引擎（MySQL/Redis）。
 2. **想避免组合类爆炸**：若用继承要 `M×N` 个类，桥接后约 `M+N`。
 3. **实现可能在运行时切换**：同一 `InstallmentCheckoutAPI` 换注入的 `PaymentBackend`（如 A/B 支付后端、故障转移）。
-4. **抽象与实现都应面向接口编程**：高层测订单模板逻辑时注入 `fakeBackend`；低层测 银行网关 时不碰 refund 包装。
-5. **实现细节应对客户端隐藏**：Client 只调 `Send` / `SendWithVars`，不知道 微信支付 还是 Stripe。
+4. **控制维与平台维都应面向接口编程**：高层测形态逻辑时注入 `fakeBackend`；测支付宝网关时不碰分期包装。
+5. **实现细节应对 Client 隐藏**：`CheckoutService` 只调 `Submit`，不知道背后是微信支付还是 Stripe。
 
 **不必强行使用**：
 
@@ -180,115 +198,17 @@ _ = stripeRefund.Refund("order-001", "用户取消订单")
 
 | 缺点 | 说明 |
 | :--- | :--- |
-| **间接层增加** | 读代码需跳 Abstraction → Implementor |
+| **间接层增加** | 读代码需跳 控制维 → 平台维（Abstraction → Implementor） |
 | **设计 upfront 成本** | 要事先识别「哪两个维度该拆」；拆错维度后期仍痛苦 |
 | **小项目显繁琐** | 固定组合少时，几个 PaymentProcessor 类比桥接更直观 |
 | **接口设计要稳** | Implementor 接口过窄要频繁改；过宽则实现类臃肿 |
 
-## 实践
+## 关联
 
-> **阅读提示**：先掌握「Abstraction 持有 PaymentBackend + refined 类型扩展格式 + 组装层自由组合」即可。本节是工程变体；初学可先跳过。
-
-### 在组装层完成「抽象 × 实现」绑定
-
-与 [工厂方法 · 按配置注入产品](/cs-fundamentals/design-patterns/factory#按配置注入产品) 类似，**选型** 留在 `main`：
-
-```go
-func NewCheckoutStack(cfg Config) (*CheckoutService, error) {
-    var backend PaymentBackend
-    switch cfg.PaymentBackend {
-    case "alipay":
-        backend = AlipayBackend{bank: LegacyBankClient{}, account: cfg.MerchantAccount}
-    case "wechat_pay":
-        backend = WeChatPayBackend{client: WeChatPayClient{}}
-    default:
-        return nil, fmt.Errorf("unknown payment backend: %q", cfg.PaymentBackend)
-    }
-
-    var sender CheckoutAPI
-    switch cfg.RequestKind {
-    case "direct":
-        sender = NewCheckoutAPI(backend)
-    case "installment":
-        return &CheckoutService{
-            sender: NewInstallmentCheckoutAPI(backend, cfg.InstallmentTemplate),
-        }, nil
-    default:
-        return nil, fmt.Errorf("unknown request kind: %q", cfg.RequestKind)
-    }
-    return &CheckoutService{sender: sender}, nil
-}
-```
-
-两个 `switch` 在 **组装层相乘**，而不是在业务方法里；新增维度只扩展对应分支。
-
-### 与适配器叠加
-
-Implementor 内部可包装遗留 SDK——桥接管 **维度拆分**，适配器管 **接口翻译**：
-
-```go
-type AlipayBackend struct {
-    adapter PaymentBackend // LegacyBankAdapter 等，已实现 Charge 或再包一层
-}
-
-func (b AlipayBackend) Charge(orderID, request string) error {
-    return b.adapter.Charge(orderID, request) // 账户等在 Adapter 组装时注入
-}
-```
-
-### 与策略的区别
-
-| | 桥接 | 策略 |
-| :--- | :--- | :--- |
-| 意图 | **抽象层 + 实现层** 两套层次都可扩展 | 替换 **一种行为/算法** |
-| 结构 | Abstraction **HAS-A** Implementor，常有 refined 抽象 | Context **HAS-A** Strategy |
-| 例子 | `InstallmentCheckoutAPI` × `WeChatPayBackend` | 排序算法、压缩算法二选一 |
-| 判断 | 两侧是否都会 **成族地** 增加类型/实现 | 是否只是 **换一种做法** |
-
-若只有「选哪种支付后端」、支付请求形态不变，[工厂方法](/cs-fundamentals/design-patterns/factory) + 单一 `PaymentProcessor` 足够；若支付请求形态与支付后端 **都会成族扩展**，用桥接。
-
-### 与装饰器的区别
-
-| | 桥接 | 装饰器 |
-| :--- | :--- | :--- |
-| 目的 | 拆 **两个变化维度** | **增强** 同一接口上的行为（重试、日志） |
-| 关系 | 抽象 **拥有** 实现 | 装饰器 **包装** 同接口组件 |
-| 叠加 | `RetryBackend` 包装 `PaymentBackend` 仍属实现层装饰 | `RetryPaymentProcessor` 包装 `PaymentProcessor` |
-
-可在 Implementor 外包装饰：`CheckoutAPI{backend: RetryBackend{inner: WeChatPayBackend{...}}}`。
-
-### Implementor 接口粒度
-
-`Charge(orderID, request string)` 保持 **最小可用**；支付后端特有参数（商户号、币种、网关地址）在 **具体 Implementor 构造时** 注入，不要泄漏到 `InstallmentCheckoutAPI`：
-
-```go
-func NewAlipayBackend(bank LegacyBankClient, merchantAccount string) AlipayBackend {
-    return AlipayBackend{bank: bank, account: merchantAccount}
-}
-```
-
-若多种 Implementor 共享重试、指标，可抽 **装饰器** 或 **中间抽象**（`BaseBackend`），而不是把横切逻辑写进每个 `Charge`。
-
-### 指针、生命周期与共享 backend
-
-重量级客户端（HTTP、连接池）在组装层 **共享一个** `WeChatPayBackend` 实例，注入多个 `CheckoutAPI` / `InstallmentCheckoutAPI`——与 [适配器 · 指针接收者与 Adaptee 生命周期](/cs-fundamentals/design-patterns/adapter#指针接收者与-adaptee-生命周期) 相同：
-
-```go
-sharedWeChatPay := WeChatPayBackend{client: weChatPayClient}
-direct := NewCheckoutAPI(sharedWeChatPay)
-tmpl := NewInstallmentCheckoutAPI(sharedWeChatPay, cfg.AlertTemplate)
-```
-
-## 小结
-
-记住这四点即可：
-
-1. **两个独立变化维度 → 桥接**：抽象（支付请求形态）与实现（支付后端）分开，用组合连接，避免 `M×N` 子类。
-2. **Abstraction 持有 Implementor**：`CheckoutAPI` 调 `PaymentBackend.Charge`，refined 类型只管格式化。
-3. **组装层做笛卡尔积**：`NewInstallmentCheckoutAPI(WeChatPayBackend{...}, tmpl)`，不必写 `WeChatPayInstallmentPaymentProcessor`。
-4. **别与适配器、策略混淆**：桥接是 **设计上的分层**；适配器是 **集成时的翻译**；策略是 **单一行为替换**。
-
-[适配器模式](/cs-fundamentals/design-patterns/adapter) 把 **现成的、接口不合** 的组件接进抽象；桥接则在 **设计之初** 就把 **会独立演化的两层** 拆开。放回电商订单系统这条主线：适配器解决「外部支付后端怎么接进来」，桥接解决「支付请求形态与支付后端如何避免组合爆炸」。当订单明细从扁平 SKU 长成嵌套套餐、礼盒时，下一篇 [组合模式](/cs-fundamentals/design-patterns/composite) 解决「如何让结算与库存对整棵明细树使用同一套接口」。
+- 桥接模式通常在开发前期就设计好，用来把程序拆成可独立演进的两部分；[适配器模式](/cs-fundamentals/design-patterns/adapter) 则多用于已有代码，让原本不兼容的类能一起工作。
+- 桥接模式、[状态模式](/cs-fundamentals/design-patterns/state)、[策略模式](/cs-fundamentals/design-patterns/strategy) 的接口结构很相似——都基于 [组合模式](/cs-fundamentals/design-patterns/composite) 式的委托，但各自要解决的问题不同。模式不仅是代码组织方式，也是与同伴讨论 **如何解题** 的共同语言。
+- 若桥接定义的控制维只能与特定平台维配合，可以用 [抽象工厂模式](/cs-fundamentals/design-patterns/abstract-factory) 封装这些配对关系，并对 Client 隐藏复杂性。
+- [生成器模式](/cs-fundamentals/design-patterns/builder) 可与桥接搭配：**指导者**（Director，封装固定构建流程）承担控制维角色，各 **生成器**（Builder）承担平台维的具体实现工作。
 
 ## 参考阅读
 

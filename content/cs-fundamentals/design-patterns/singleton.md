@@ -40,11 +40,7 @@ func submitRefund(...) error {
 
 ```go
 type CheckoutHub struct {
-    alipay   PaymentProcessor
-    wechatPay     PaymentProcessor
-    creditCard    PaymentProcessor
     limiter *RateLimiter
-    metrics *Metrics
 }
 
 var (
@@ -55,13 +51,7 @@ var (
 // Instance 懒加载：首次调用时初始化，之后始终返回同一指针
 func Instance() *CheckoutHub {
     hubOnce.Do(func() {
-        hubInstance = &CheckoutHub{
-            alipay:   NewAlipayProcessor(),
-            wechatPay:     NewWeChatPayProcessor(),
-            creditCard:    NewCreditCardProcessor(),
-            limiter: NewRateLimiter(1000),
-            metrics: NewMetrics(),
-        }
+        hubInstance = &CheckoutHub{limiter: NewRateLimiter(1000)}
     })
     return hubInstance
 }
@@ -70,81 +60,24 @@ func (h *CheckoutHub) Checkout(n *Order) error {
     if err := h.limiter.Wait(context.Background()); err != nil {
         return err
     }
-    processor := h.pick(n.PaymentMethod)
-    err := processor.Pay(n)
-    h.metrics.Record(n.PaymentMethod, err)
-    return err
-}
-```
-
-### 组装阶段注入支付渠道（推荐变体）
-
-单例不等于「写死 `NewAlipayProcessor()`」。可在 **首次初始化** 时接受依赖，仍保证只初始化一次：
-
-```go
-type HubConfig struct {
-    Alipay PaymentProcessor
-    WeChatPay   PaymentProcessor
-    CreditCard  PaymentProcessor
-}
-
-var hubCfg HubConfig
-
-func Configure(cfg HubConfig) {
-    hubCfg = cfg
-}
-
-func Instance() *CheckoutHub {
-    hubOnce.Do(func() {
-        if hubCfg.Alipay == nil {
-            hubCfg.Alipay = NewAlipayProcessor()
-        }
-        hubInstance = &CheckoutHub{
-            alipay:   hubCfg.Alipay,
-            wechatPay:     hubCfg.WeChatPay,
-            creditCard:    hubCfg.CreditCard,
-            limiter: NewRateLimiter(1000),
-            metrics: NewMetrics(),
-        }
-    })
-    return hubInstance
-}
-
-// main 里：测试可注入 mock，生产用真实实现
-func main() {
-    Configure(HubConfig{
-        Alipay: NewAlipayProcessor(),
-        WeChatPay:   NewWeChatPayProcessor(),
-        CreditCard:  NewCreditCardProcessor(),
-    })
-    // …
+    // 路由支付、记录指标…
+    return pay(n)
 }
 ```
 
 ### 使用者
 
-业务与 [原型](/cs-fundamentals/design-patterns/prototype) 组合：克隆订单模板后交给 **唯一** hub 派发：
+业务入口只 **取用** 单例，不各自 `New`：
 
 ```go
-func submitOrder(reg *OrderTemplateRegistry, buyer, orderID string) error {
-    proto, err := reg.Clone("bundle_reorder")
-    if err != nil {
-        return err
-    }
-    // SubmitClone 内部最终调用 checkouthub.Instance().Checkout(…)
-    return proto.SubmitClone(buyer, map[string]string{"SKU": orderID})
+func submitOrder(order *Order) error {
+    return checkouthub.Instance().Checkout(order)
+}
+
+func submitRefund(order *Order) error {
+    return checkouthub.Instance().Refund(order)
 }
 ```
-
-与「每处 `NewCheckoutHub()`」对比：
-
-| | 随处 `New` | 单例 |
-| :--- | :--- | :--- |
-| 限流 | 每实例独立计数 | 全进程共享配额 |
-| 连接 / 指标 | 重复持有、统计分散 | 一份连接池、一份 metrics |
-| 调用方 | 要知道如何组装 hub | `Instance().Checkout(…)` |
-| 测试 | 难以替换全局依赖 | `Configure(mock)` 或注入接口（见下文） |
-
 
 ## 适用场景
 
@@ -200,62 +133,40 @@ func Instance() *CheckoutHub {
 
 ### 依赖注入与单例的取舍
 
-很多 Go 代码 **不在业务里调 `Instance()`**，而在 `main` 里构造唯一 `*CheckoutHub`，通过构造函数注入：
+单例要约束的是 **进程内只有一份实例**；至于这份实例 **怎么交到业务手里**，常见有两种写法，别混为一谈。
+
+**`Instance()` 全局访问点**：类型自己保管唯一实例，调用方随处 `checkouthub.Instance()` 取用。好处是调用简单，库和 SDK 边界也常见——用户不必从 `main` 一路传参。代价是依赖藏在静态入口里，读代码时看不出 `CheckoutService` 其实依赖 hub，测试时也难直接换成 mock。
+
+**组装层注入同一指针**：`main` 里 `hub := NewCheckoutHub()` 只执行一次，再把 **同一个** `*CheckoutHub` 传给 `CheckoutService`、`RefundHandler` 等。业务代码用的是字段 `s.hub`，不是 `Instance()`。实例数量仍是 **一份**，限流与指标照样共享；「唯一性」由组装层保证，而不是类型内部的隐藏全局。
+
+两种写法 **语义等价**（同一指针、同一份状态），差别在依赖是否可见、测试是否顺手：
 
 ```go
+// main：只构造一次，多处注入同一指针
+hub := NewCheckoutHub()
+svc := NewCheckoutService(hub)
+
 type CheckoutService struct {
-    hub  *CheckoutHub // main 里 New 一次，全应用共享同一指针
-    reg  *OrderTemplateRegistry
+    hub *CheckoutHub
 }
 
-func NewCheckoutService(hub *CheckoutHub, reg *OrderTemplateRegistry) *CheckoutService {
-    return &CheckoutService{hub: hub, reg: reg}
+func NewCheckoutService(hub *CheckoutHub) *CheckoutService {
+    return &CheckoutService{hub: hub}
 }
 
-func (s *CheckoutService) SendOrderShipped(buyer, orderID string) error {
-    proto, err := s.reg.Clone("bundle_reorder")
-    if err != nil {
-        return err
-    }
-    n, err := materializeForCheckout(proto, buyer, map[string]string{"SKU": orderID})
-    if err != nil {
-        return err
-    }
-    return s.hub.Checkout(n) // 注入的 hub 与 Instance() 可以是同一指针
+func (s *CheckoutService) Submit(order *Order) error {
+    return s.hub.Checkout(order)
 }
 ```
 
-| | `Instance()` 单例 | `main` 注入同一指针 |
+| | `Instance()` 单例 | 组装层注入同一指针 |
 | :--- | :--- | :--- |
-| 实例数量 | 进程内唯一 | 进程内唯一（由组装层保证） |
-| 依赖可见性 | 隐式 | 显式，构造签名即文档 |
-| 测试 | 需全局 `Configure` / reset | 直接 `NewCheckoutService(mockHub, …)` |
-| 更符合 Go 社区习惯 | 库、SDK 边界常见 | **应用内部更常见** |
+| 实例数量 | 进程内唯一 | 进程内唯一 |
+| 依赖可见性 | 隐式，调用链上看不出 | 显式，构造参数即文档 |
+| 测试 | 常需 `Configure`、reset 或接口抽象 | 直接 `NewCheckoutService(mockHub)` |
+| 常见场景 | 库、SDK、必须随处可取的全局设施 | **应用内部** 更常见 |
 
-**结论**：需要「全局访问点」时可用单例；应用内部更推荐 **组装层造一份、注入传递**——语义仍是「只有一个 hub」，但不引入隐藏全局。
-
-### 测试：可替换的单例
-
-若保留 `Instance()`，为测试提供 **重置** 或 **配置钩子**（仅测试包使用，生产勿暴露随意 reset）：
-
-```go
-// testing 包或 internal 测试辅助
-func resetForTest(t *testing.T) {
-    t.Helper()
-    hubOnce = sync.Once{}
-    hubInstance = nil
-    t.Cleanup(func() {
-        hubOnce = sync.Once{}
-        hubInstance = nil
-    })
-}
-```
-
-更好的做法是：**业务依赖接口** `type Dispatcher interface { Checkout(*Order) error }`，生产实现委托给 `Instance()`，测试注入 fake。
-
-### 单例 ≠ 分布式唯一
-
-`CheckoutHub` 的单例保证 **单个进程内** 只有一份。多实例部署（Kubernetes 多 Pod）时，全局限流仍需 **Redis / 中央配额服务**——单例解决不了跨进程协调，不要误以为「用了单例就不会超卖或超扣」。
+**结论**：需要「随处可取的全局入口」时用 `Instance()`；应用内部更推荐 **组装层造一份、注入传递**——仍是单例语义，但不引入隐藏全局，也更符合 Go 的显式依赖习惯。
 
 ### 与枚举式单例
 
@@ -269,16 +180,11 @@ type checkoutHub struct { /* 小写，包外无法 New */ }
 
 与 `Instance()` 等价，风格更「Go idiom」。
 
-## 小结
+## 关联
 
-记住这四点即可：
-
-1. **需要全局一份状态或昂贵资源 → 考虑单例**：限流、连接池、统一结算中心。
-2. **Go 用 `sync.Once` 做懒加载**：不要用无锁的 `if instance == nil`。
-3. **应用内部优先注入同一指针**：`main` 里 `New` 一次传入 `Service`，比随处 `Instance()` 更易测。
-4. **单例只管进程内唯一**：分布式限流、幂等等仍需基础设施，不能单靠模式。
-
-上一篇的 [原型模式](/cs-fundamentals/design-patterns/prototype) 管 **从订单模板安全复制订单体**；本篇管 **用唯一枢纽把订单发出去**。克隆订单模板 → 原型；共享结算与配额 → 单例。到这里，创建型模式这条线已经覆盖了「支付渠道怎么造、套装怎么配、订单怎么构建、订单模板怎么复制、派发基础设施怎么共享」。
+- [外观模式](/cs-fundamentals/design-patterns/facade) 类通常可以转换为 [单例模式](/cs-fundamentals/design-patterns/singleton) 类——在大部分情况下，一个外观对象就足够了。
+- 如果你能将对象的所有共享状态简化为一个享元对象，[享元模式](/cs-fundamentals/design-patterns/flyweight) 就和单例有些相似；但二者有两个根本区别：进程内 **只有一个** 单例实例，享元类却可以有多份实体、各份内在状态也可不同；单例对象 **可以是可变的**，享元对象 **应当是不可变的**。
+- [抽象工厂模式](/cs-fundamentals/design-patterns/abstract-factory)、[生成器模式](/cs-fundamentals/design-patterns/builder) 和 [原型模式](/cs-fundamentals/design-patterns/prototype) 都可以用 [单例模式](/cs-fundamentals/design-patterns/singleton) 来实现。
 
 ## 参考阅读
 

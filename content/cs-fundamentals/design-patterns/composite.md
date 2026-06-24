@@ -37,9 +37,7 @@ func cartTotal(items []CartItem) int64 {
 
 ## 解决方案
 
-定义 **组件** 接口 `OrderLine`，让 **叶子**（单品）与 **组合**（套餐）都实现它；组合体在 `Total`、`Validate` 等方法里 **遍历 children 并聚合结果**。
-
-### 组件（Component）
+定义 **组件** 接口 `OrderLine`，**叶子** `ProductLine` 与 **组合** `BundleLine` 都实现它；组合体 **递归 children**，Client 只调接口、不写 `if bundle`。
 
 ```go
 type OrderLine interface {
@@ -47,65 +45,34 @@ type OrderLine interface {
     Validate() error
     ReserveInventory() error
 }
-```
 
-客户端只依赖这一接口，不依赖具体是 `ProductLine` 还是 `BundleLine`。
-
-### 叶子（Leaf）
-
-```go
+// 叶子：只处理本行
 type ProductLine struct {
-    SKU      string
-    Name     string
-    Quantity int
+    SKU       string
+    Quantity  int
     UnitPrice int64
 }
 
-func (p ProductLine) Total() int64 {
-    return p.UnitPrice * int64(p.Quantity)
-}
+func (p ProductLine) Total() int64 { return p.UnitPrice * int64(p.Quantity) }
+func (p ProductLine) Validate() error { /* 校验 sku、数量… */ return nil }
+func (p ProductLine) ReserveInventory() error { return inventory.Reserve(p.SKU, p.Quantity) }
 
-func (p ProductLine) Validate() error {
-    if p.SKU == "" {
-        return fmt.Errorf("product line: missing sku")
-    }
-    if p.Quantity <= 0 {
-        return fmt.Errorf("product line %s: invalid quantity", p.SKU)
-    }
-    return nil
-}
-
-func (p ProductLine) ReserveInventory() error {
-    return inventory.Reserve(p.SKU, p.Quantity)
-}
-```
-
-### 组合（Composite）
-
-```go
+// 组合：遍历 children，委托同一接口
 type BundleLine struct {
-    BundleID string
-    Name     string
     Children []OrderLine
 }
 
 func (b BundleLine) Total() int64 {
     var sum int64
-    for _, child := range b.Children {
-        sum += child.Total()
+    for _, c := range b.Children {
+        sum += c.Total()
     }
     return sum
 }
 
 func (b BundleLine) Validate() error {
-    if b.BundleID == "" {
-        return fmt.Errorf("bundle line: missing bundle id")
-    }
-    if len(b.Children) == 0 {
-        return fmt.Errorf("bundle %s: empty children", b.BundleID)
-    }
-    for _, child := range b.Children {
-        if err := child.Validate(); err != nil {
+    for _, c := range b.Children {
+        if err := c.Validate(); err != nil {
             return err
         }
     }
@@ -113,8 +80,8 @@ func (b BundleLine) Validate() error {
 }
 
 func (b BundleLine) ReserveInventory() error {
-    for _, child := range b.Children {
-        if err := child.ReserveInventory(); err != nil {
+    for _, c := range b.Children {
+        if err := c.ReserveInventory(); err != nil {
             return err
         }
     }
@@ -122,16 +89,10 @@ func (b BundleLine) ReserveInventory() error {
 }
 ```
 
-### 客户端
-
 ```go
-type CheckoutService struct {
-    lines []OrderLine
-}
-
-func (svc *CheckoutService) Checkout() error {
+func checkout(lines []OrderLine) error {
     var amount int64
-    for _, line := range svc.lines {
+    for _, line := range lines {
         if err := line.Validate(); err != nil {
             return err
         }
@@ -142,31 +103,19 @@ func (svc *CheckoutService) Checkout() error {
     }
     return charge(amount)
 }
+
+// 嵌套礼盒：递归在 BundleLine 内部，Client 无需感知层级
+giftBox := BundleLine{Children: []OrderLine{
+    ProductLine{SKU: "tea-001", Quantity: 1, UnitPrice: 8800},
+    BundleLine{Children: []OrderLine{
+        ProductLine{SKU: "nut-002", Quantity: 2, UnitPrice: 1500},
+    }},
+    ProductLine{SKU: "book-99", Quantity: 1, UnitPrice: 4500},
+}}
+_ = checkout([]OrderLine{giftBox}) // 11800
 ```
 
-组装一棵 **嵌套礼盒** 时，客户端仍只调 `Total()`——递归发生在 `BundleLine` 内部：
-
-```go
-giftBox := BundleLine{
-    BundleID: "gift-2026",
-    Name:     "春节礼盒",
-    Children: []OrderLine{
-        ProductLine{SKU: "tea-001", Quantity: 1, UnitPrice: 8800},
-        BundleLine{
-            BundleID: "snack-pack",
-            Name:     "零食小包",
-            Children: []OrderLine{
-                ProductLine{SKU: "nut-002", Quantity: 2, UnitPrice: 1500},
-            },
-        },
-    },
-}
-
-svc := &CheckoutService{lines: []OrderLine{giftBox, ProductLine{SKU: "book-99", Quantity: 1, UnitPrice: 4500}}}
-_ = svc.Checkout() // 11800，无需 if bundle
-```
-
-新增 **赠品行**、**虚拟 bundle** → 新实现 `OrderLine`，`CheckoutService` **不必改**。
+新增赠品行、虚拟 bundle → 新实现 `OrderLine`，`checkout` **不必改**。
 
 
 ## 适用场景
@@ -205,36 +154,6 @@ _ = svc.Checkout() // 11800，无需 if bundle
 
 ## 实践
 
-> **阅读提示**：先掌握「`OrderLine` 接口 + Leaf/Composite 实现 + Client 只调接口」即可。本节是工程变体；初学可先跳过。
-
-### 用生成器 / 工厂组装树
-
-明细树常在 **下单前** 由 Builder 或工厂拼好，再交给 `CheckoutService`：
-
-```go
-func NewSpringGiftBox() OrderLine {
-    return BundleLine{
-        BundleID: "gift-2026",
-        Name:     "春节礼盒",
-        Children: []OrderLine{
-            ProductLine{SKU: "tea-001", Quantity: 1, UnitPrice: 8800},
-            NewSnackPack(), // 子工厂返回嵌套 BundleLine
-        },
-    }
-}
-
-func buildOrderFromBuilder(b *OrderBuilder) []OrderLine {
-    order := b.Build()
-    lines := make([]OrderLine, len(order.Items))
-    for i, item := range order.Items {
-        lines[i] = ProductLine{SKU: item.SKU, Quantity: item.Qty, UnitPrice: item.Price}
-    }
-    return lines
-}
-```
-
-**构建树**（Builder/工厂）与 **遍历树**（Composite Client）分层：Builder 知道 SKU 与 bundle 模板；Checkout 只认 `OrderLine`。
-
 ### 安全组合：结构编辑 API
 
 若购物车 UI 需要 **增删子行**，可把编辑方法只放在 Composite 上（或单独 `LineMutator` 接口）：
@@ -252,22 +171,6 @@ func (b *BundleLine) Add(child OrderLine) {
 ```
 
 Client 若 **只读结算**，仍依赖 `OrderLine`；编辑模块依赖 `MutableBundle`，避免 Leaf 实现无意义的 `Add`。
-
-### 与装饰器的区别
-
-两者都「持有同接口对象、往下委托」，容易看成同一种递归。差别在 **问的问题**：
-
-| | 组合 | 装饰器 |
-| :--- | :--- | :--- |
-| **问的是** | 这一行 **由哪些独立明细组成** | 这一行 **还是原来那行**，叠了哪些规则 |
-| **拓扑** | 树，1 → **N** 个兄弟 | 链，1 → **1** 个 inner |
-| **递归** | **汇总** peer：`sum += child.Total()` | **变换** spine：`transform(inner.Total())` |
-| **实体数** | 礼盒含茶 + 杯 = **2 件货** | 茶 + 券 + 包装 = **还是 1 行茶** |
-| **child 能否独立存在** | 能，每个 SKU 可单独下单 | 不能，`CouponLine` 离开 `inner` 无意义 |
-
-若把优惠券硬写成 bundle 的一个 child，计价也许能凑对，但列表、库存、满减分摊的语义都会错——优惠券不是一件商品。详见 [装饰器模式 · 装饰器像「只有一个子节点的 Bundle」吗？](/cs-fundamentals/design-patterns/decorator#装饰器像只有一个子节点的-bundle-吗)。
-
-可叠加：`BundleLine` 的 child 可以是 `DiscountLine{inner: ProductLine{...}}`，只要 `DiscountLine` 也实现 `OrderLine`。
 
 ### 与迭代器 / 扁平化
 
@@ -315,16 +218,15 @@ func (b BundleLine) ReserveInventory() error {
 
 策略（全失败才回滚 vs 部分成功）属于业务规则，Composite 只负责 **把递归与聚合方式集中在一处**。
 
-## 小结
+## 关联
 
-记住这四点即可：
-
-1. **部分-整体是树 → 组合**：单品与套餐都实现同一 `OrderLine`，Client 不写 `if bundle`。
-2. **Composite 递归、Leaf 干活**：`BundleLine.Total()` 汇总子节点；`ProductLine.Total()` 算本行。
-3. **与适配器、桥接正交**：组合管 **订单里有什么**；适配器管 **接口翻译**；桥接管 **两维独立变化**。
-4. **注意接口别无限变胖**：只读遍历用透明组合；操作暴增时拆接口或访问者。
-
-[桥接模式](/cs-fundamentals/design-patterns/bridge) 把 **支付请求形态与支付后端** 拆开；组合模式把 **订单明细的树形结构** 与 **结算/校验/库存** 的调用方式统一。放回电商订单系统这条主线：明细从扁平 SKU 长成嵌套套餐时，用组合让 `CheckoutService` 始终只面对 `OrderLine`。当同一行还要叠加会员价、优惠券、礼品包装等可选增强时，下一篇 [装饰器模式](/cs-fundamentals/design-patterns/decorator) 说明如何动态包装而不必穷举子类。
+- [桥接模式](/cs-fundamentals/design-patterns/bridge)、[状态模式](/cs-fundamentals/design-patterns/state)、[策略模式](/cs-fundamentals/design-patterns/strategy)（以及在一定程度上 [适配器模式](/cs-fundamentals/design-patterns/adapter)）的接口结构很相似——都基于组合式的委托，但各自要解决的问题不同。模式不仅是代码组织方式，也是与同伴讨论 **如何解题** 的共同语言。
+- 构建复杂组合模式树时，[生成器模式](/cs-fundamentals/design-patterns/builder) 的构建步骤可以 **递归** 执行——父节点和子节点用同一套分步 API 逐层填好。
+- [责任链模式](/cs-fundamentals/design-patterns/chain-of-responsibility) 常与组合搭配：叶子收到请求后，可沿父组件链一路传到树的根节点。
+- 可用 [迭代器模式](/cs-fundamentals/design-patterns/iterator) 遍历组合树；可用 [访问者模式](/cs-fundamentals/design-patterns/visitor) 对整棵树执行同一类操作。
+- [享元模式](/cs-fundamentals/design-patterns/flyweight) 可实现组合树中 **共享的叶子节点**，节省内存。
+- [装饰模式](/cs-fundamentals/design-patterns/decorator) 与组合的结构图很像——都靠递归组合组织对象；差别在于装饰器通常 **只有一个** 子组件，且 **增强** 被包装对象的行为，而组合体对子节点 **求和 / 聚合**。二者可叠加：用装饰器扩展组合树中 **某个** 节点的行为。
+- 大量使用组合和装饰的设计，通常可从 [原型模式](/cs-fundamentals/design-patterns/prototype) 中获益——克隆复杂结构，而非从零重新构造。
 
 ## 参考阅读
 
