@@ -36,38 +36,38 @@ order: 1
 
 | 模式 | 别名 | 描述 |
 | :--- | :--- | :--- |
-| [工厂方法模式](/cs-fundamentals/design-patterns/factory) | 虚拟构造器、Factory Method | 提供一种创建对象的方式，使创建过程与使用过程分离。 |
-| [抽象工厂模式](/cs-fundamentals/design-patterns/abstract-factory) | Abstract Factory | 提供创建一系列相关或相互依赖对象的接口，而无需指定它们具体的类。 |
-| [生成器模式](/cs-fundamentals/design-patterns/builder) | 建造者模式、Builder | 分步骤构建复杂对象，将构建过程与最终表示分离。 |
-| [原型模式](/cs-fundamentals/design-patterns/prototype) | 克隆、Clone、Prototype | 通过复制已有实例创建新对象，将克隆过程与使用过程分离。 |
-| [单例模式](/cs-fundamentals/design-patterns/singleton) | 单件模式、Singleton | 保证一个类仅有一个实例，并提供一个访问它的全局访问点。 |
+| [工厂方法模式](/cs-fundamentals/design-patterns/factory)（Factory Method） | 虚拟构造器 | 提供一种创建对象的方式，使创建过程与使用过程分离。 |
+| [抽象工厂模式](/cs-fundamentals/design-patterns/abstract-factory)（Abstract Factory） | — | 提供创建一系列相关或相互依赖对象的接口，而无需指定它们具体的类。 |
+| [生成器模式](/cs-fundamentals/design-patterns/builder)（Builder） | 建造者模式 | 分步骤构建复杂对象，将构建过程与最终表示分离。 |
+| [原型模式](/cs-fundamentals/design-patterns/prototype)（Prototype） | 克隆 | 通过复制已有实例创建新对象，将克隆过程与使用过程分离。 |
+| [单例模式](/cs-fundamentals/design-patterns/singleton)（Singleton） | 单件模式 | 保证一个类仅有一个实例，并提供一个访问它的全局访问点。 |
 
 ### 结构型模式
 
 | 模式 | 别名 | 描述 |
 | :--- | :--- | :--- |
-| [适配器模式](/cs-fundamentals/design-patterns/adapter) | 封装器模式、Wrapper、Adapter | 将一个类的接口转换成客户期望的另一个接口，使原本因接口不兼容而不能一起工作的类可以一起工作。 |
-| [桥接模式](/cs-fundamentals/design-patterns/bridge) | Bridge | 将抽象部分与实现部分分离，使它们都可以独立地变化。 |
-| [组合模式](/cs-fundamentals/design-patterns/composite) | 对象树、Object Tree、Composite | 将对象组合成树形结构以表示部分-整体层次，使客户端对单个对象和组合对象的使用具有一致性。 |
-| [装饰器模式](/cs-fundamentals/design-patterns/decorator) | 装饰模式、装饰者模式、Wrapper、Decorator | 动态地给对象添加额外的职责，比生成子类更灵活地扩展功能。 |
-| [外观模式](/cs-fundamentals/design-patterns/facade) | 门面模式、Facade | 为复杂子系统提供统一的高层接口，使客户端更容易使用整组能力。 |
-| [享元模式](/cs-fundamentals/design-patterns/flyweight) | 缓存、Cache、Flyweight | 运用共享技术支持大量细粒度对象，将内部状态与外部状态分离并按键复用。 |
-| [代理模式](/cs-fundamentals/design-patterns/proxy) | Proxy | 为其他对象提供替身以控制对其的访问，在委托真实主题前后插入懒加载、鉴权、远程或缓存等逻辑。 |
+| [适配器模式](/cs-fundamentals/design-patterns/adapter)（Adapter） | 封装器模式 | 将一个类的接口转换成客户期望的另一个接口，使原本因接口不兼容而不能一起工作的类可以一起工作。 |
+| [桥接模式](/cs-fundamentals/design-patterns/bridge)（Bridge） | — | 将抽象部分与实现部分分离，使它们都可以独立地变化。 |
+| [组合模式](/cs-fundamentals/design-patterns/composite)（Composite） | 对象树 | 将对象组合成树形结构以表示部分-整体层次，使客户端对单个对象和组合对象的使用具有一致性。 |
+| [装饰器模式](/cs-fundamentals/design-patterns/decorator)（Decorator） | 装饰模式、装饰者模式 | 动态地给对象添加额外的职责，比生成子类更灵活地扩展功能。 |
+| [外观模式](/cs-fundamentals/design-patterns/facade)（Facade） | 门面模式 | 为复杂子系统提供统一的高层接口，使客户端更容易使用整组能力。 |
+| [享元模式](/cs-fundamentals/design-patterns/flyweight)（Flyweight） | 缓存 | 运用共享技术支持大量细粒度对象，将内部状态与外部状态分离并按键复用。 |
+| [代理模式](/cs-fundamentals/design-patterns/proxy)（Proxy） | — | 为其他对象提供替身以控制对其的访问，在委托真实主题前后插入懒加载、鉴权、远程或缓存等逻辑。 |
 
 ### 行为型模式
 
 | 模式 | 别名 | 描述 |
 | :--- | :--- | :--- |
-| [责任链模式](/cs-fundamentals/design-patterns/chain-of-responsibility) | 职责链模式、命令链、CoR、Chain of Command、Chain of Responsibility | 使多个对象都有机会处理请求，将处理者连成链并沿链传递，直到有对象处理或全会签通过。 |
-| [命令模式](/cs-fundamentals/design-patterns/command) | 动作、事务、Action、Transaction、Command | 将请求封装为对象，从而支持参数化、排队、日志记录以及撤销与重做。 |
-| [迭代器模式](/cs-fundamentals/design-patterns/iterator) | Iterator | 提供顺序访问聚合元素的方法而不暴露内部表示，支持多种遍历策略与分页流式访问。 |
-| [中介者模式](/cs-fundamentals/design-patterns/mediator) | 调解人、控制器、Intermediary、Controller、Mediator | 用中介对象封装一组对象之间的交互，使同事不必相互引用，降低网状耦合并集中联动规则。 |
-| [备忘录模式](/cs-fundamentals/design-patterns/memento) | 快照、Snapshot、Memento | 在不破坏封装的前提下捕获并外部保存对象状态，以便之后由发起人将其恢复到先前状态。 |
-| [观察者模式](/cs-fundamentals/design-patterns/observer) | 事件订阅者、监听者、Event-Subscriber、Listener、Observer | 定义一对多依赖，主题状态变更时自动通知所有观察者，使写状态与扇出副作用解耦。 |
-| [状态模式](/cs-fundamentals/design-patterns/state) | State | 允许对象在内部状态改变时改变行为，将各态允许的操作与状态迁移封装在独立 State 中。 |
-| [策略模式](/cs-fundamentals/design-patterns/strategy) | Strategy | 封装一族可互换算法，使它们可独立于客户端替换，消除 Context 内的条件分支。 |
-| [模板方法模式](/cs-fundamentals/design-patterns/template-method) | Template Method | 在模板方法中定义算法骨架，将可变步骤延迟到子类或钩子，复用流程并固定顺序与补偿。 |
-| [访问者模式](/cs-fundamentals/design-patterns/visitor) | Visitor | 在不改变元素类的前提下，将作用于结构上各元素的操作封装为访问者，通过 Accept/Visit 双重分派。 |
+| [责任链模式](/cs-fundamentals/design-patterns/chain-of-responsibility)（Chain of Responsibility） | 职责链模式、命令链 | 使多个对象都有机会处理请求，将处理者连成链并沿链传递，直到有对象处理或全会签通过。 |
+| [命令模式](/cs-fundamentals/design-patterns/command)（Command） | 动作、事务 | 将请求封装为对象，从而支持参数化、排队、日志记录以及撤销与重做。 |
+| [迭代器模式](/cs-fundamentals/design-patterns/iterator)（Iterator） | — | 提供顺序访问聚合元素的方法而不暴露内部表示，支持多种遍历策略与分页流式访问。 |
+| [中介者模式](/cs-fundamentals/design-patterns/mediator)（Mediator） | 调解人、控制器 | 用中介对象封装一组对象之间的交互，使同事不必相互引用，降低网状耦合并集中联动规则。 |
+| [备忘录模式](/cs-fundamentals/design-patterns/memento)（Memento） | 快照 | 在不破坏封装的前提下捕获并外部保存对象状态，以便之后由发起人将其恢复到先前状态。 |
+| [观察者模式](/cs-fundamentals/design-patterns/observer)（Observer） | 事件订阅者、监听者 | 定义一对多依赖，主题状态变更时自动通知所有观察者，使写状态与扇出副作用解耦。 |
+| [状态模式](/cs-fundamentals/design-patterns/state)（State） | — | 允许对象在内部状态改变时改变行为，将各态允许的操作与状态迁移封装在独立 State 中。 |
+| [策略模式](/cs-fundamentals/design-patterns/strategy)（Strategy） | — | 封装一族可互换算法，使它们可独立于客户端替换，消除 Context 内的条件分支。 |
+| [模板方法模式](/cs-fundamentals/design-patterns/template-method)（Template Method） | — | 在模板方法中定义算法骨架，将可变步骤延迟到子类或钩子，复用流程并固定顺序与补偿。 |
+| [访问者模式](/cs-fundamentals/design-patterns/visitor)（Visitor） | — | 在不改变元素类的前提下，将作用于结构上各元素的操作封装为访问者，通过 Accept/Visit 双重分派。 |
 
 ## 其他资源
 

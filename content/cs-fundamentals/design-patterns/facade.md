@@ -3,7 +3,7 @@ title: 外观模式
 order: 10
 ---
 
-**外观模式** 亦称 **门面模式**（Facade），为子系统中的一组接口提供一个统一的接口，使得这一子系统更加容易使用。
+**外观模式**（Facade）亦称 **门面模式**，为子系统中的一组接口提供一个统一的接口，使得这一子系统更加容易使用。
 
 通俗地说，多个子系统之间的调用顺序、出错怎么回滚，集中到一个统一入口里编排；各客户端只调这一个门面完成一件事，不必逐个认识子系统，也不必自己拼流程。
 
@@ -38,7 +38,7 @@ func (c *CheckoutController) PlaceOrder(ctx context.Context, req PlaceOrderReque
 
 ### 子系统（Subsystem）
 
-各子系统保持 **独立 package / 接口**，可被其他用例单独使用（如仅查库存、仅退款）：
+各子系统保持 **独立接口**，可被其他用例单独使用（如仅查库存、仅退款）。下单用例里 **强一致** 路径通常只需四个：
 
 ```go
 type InventoryService interface {
@@ -59,21 +59,9 @@ type OrderRepository interface {
     NextID() string
     Save(ctx context.Context, order Order) error
 }
-
-type NotificationService interface {
-    SendOrderConfirmation(orderID string) error
-}
-
-type InvoiceService interface {
-    Issue(orderID string) error
-}
-
-type AuditService interface {
-    Log(event, orderID string) error
-}
 ```
 
-`PricingEngine` 内部可遍历 [组合](/cs-fundamentals/design-patterns/composite) 树与 [装饰器](/cs-fundamentals/design-patterns/decorator) 链——外观 **不展开** 明细结构。
+通知、发票、审计等 **尽力而为** 步骤可另接子系统，或在落库成功后异步投递——外观 **只编排关键路径**，不必把全站服务都塞进 struct。`PricingEngine` 内部可遍历 [组合](/cs-fundamentals/design-patterns/composite) 树与 [装饰器](/cs-fundamentals/design-patterns/decorator) 链，外观 **不展开** 明细结构。
 
 ### 外观（Facade）
 
@@ -83,101 +71,56 @@ type CheckoutFacade struct {
     pricing   PricingEngine
     payment   PaymentProcessor
     orders    OrderRepository
-    notify    NotificationService
-    invoice   InvoiceService
-    audit     AuditService
 }
 
-func NewCheckoutFacade(
-    inv InventoryService,
-    pricing PricingEngine,
-    pay PaymentProcessor,
-    orders OrderRepository,
-    notify NotificationService,
-    invoice InvoiceService,
-    audit AuditService,
-) CheckoutFacade {
-    return CheckoutFacade{
-        inventory: inv, pricing: pricing, payment: pay,
-        orders: orders, notify: notify, invoice: invoice, audit: audit,
-    }
-}
-
-func (f CheckoutFacade) PlaceOrder(ctx context.Context, req PlaceOrderRequest) (OrderResult, error) {
+func (f CheckoutFacade) PlaceOrder(ctx context.Context, req PlaceOrderRequest) (string, error) {
     lines := req.Lines
-
-    for _, line := range lines {
-        if err := line.Validate(); err != nil {
-            return OrderResult{}, fmt.Errorf("validate: %w", err)
-        }
-    }
     if err := f.inventory.Reserve(lines); err != nil {
-        return OrderResult{}, fmt.Errorf("reserve: %w", err)
+        return "", err
     }
 
-    amount := f.pricing.Total(lines)
-    orderID := f.orders.NextID()
-    order := Order{ID: orderID, Lines: lines, Amount: amount, UserID: req.UserID}
+    order := Order{
+        ID:     f.orders.NextID(),
+        Lines:  lines,
+        Amount: f.pricing.Total(lines),
+        UserID: req.UserID,
+    }
 
     if err := f.payment.Pay(order); err != nil {
         _ = f.inventory.Release(lines)
-        return OrderResult{}, fmt.Errorf("pay: %w", err)
+        return "", err
     }
-
     if err := f.orders.Save(ctx, order); err != nil {
-        _ = f.payment.Refund(orderID)
+        _ = f.payment.Refund(order.ID)
         _ = f.inventory.Release(lines)
-        return OrderResult{}, fmt.Errorf("save: %w", err)
+        return "", err
     }
-
-    // 落库成功后：异步步骤失败通常记日志 + 重试，不整单回滚（按业务约定）
-    _ = f.notify.SendOrderConfirmation(orderID)
-    _ = f.invoice.Issue(orderID)
-    _ = f.audit.Log("order.placed", orderID)
-
-    return OrderResult{OrderID: orderID, Amount: amount}, nil
+    return order.ID, nil
 }
 ```
 
-> **对照「问题」一节**：`CheckoutFacade.PlaceOrder` 与 `CheckoutController.PlaceOrder` **业务步骤相同**——这正是预期。差别在于 **这段逻辑归属哪一层、会被几个入口调用**。下面 Client 一节展示 **多入口共用**；若你只在 Controller 里写 Facade 调用、编排仍散落别处，就没有用到外观的核心价值。
+> **对照「问题」一节**：步骤与 Controller 里手写的一样——差别在于编排 **归属 Facade**，可被多个入口共用；若只在 Controller 里调 Facade、别处仍复制编排，就没有用到外观的核心价值。
 
 ### 客户端（Client）
+
+HTTP、后台、Worker 等 **只依赖 Facade**，不再 import 各子系统：
 
 ```go
 type CheckoutController struct {
     checkout CheckoutFacade
 }
 
-func (c *CheckoutController) HandlePlaceOrder(w http.ResponseWriter, r *http.Request) {
-    var req PlaceOrderRequest
-    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-        http.Error(w, err.Error(), http.StatusBadRequest)
-        return
-    }
-    result, err := c.checkout.PlaceOrder(r.Context(), req)
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusUnprocessableEntity)
-        return
-    }
-    _ = json.NewEncoder(w).Encode(result)
+func (c *CheckoutController) PlaceOrder(ctx context.Context, req PlaceOrderRequest) (string, error) {
+    return c.checkout.PlaceOrder(ctx, req)
 }
-```
 
-组装层注入真实子系统或 fake：
-
-```go
-facade := NewCheckoutFacade(
-    inventorySvc, pricingEngine, paymentProcessor,
-    orderRepo, notifySvc, invoiceSvc, auditSvc,
-)
-
-// 多个入口注入 **同一个** Facade——编排只维护在 Facade 内
+// 组装层：多个入口注入 **同一个** Facade
+facade := CheckoutFacade{inventory: inv, pricing: pricing, payment: pay, orders: orders}
 httpCtrl := &CheckoutController{checkout: facade}
-adminCtrl := &AdminController{checkout: facade}
 worker := &OrderRetryWorker{checkout: facade}
 ```
 
-新增 `RiskService.Check` → **只改** `CheckoutFacade.PlaceOrder` 一处；三个入口 **都不改**。这才是与「问题」里单 Controller 写法对比时，Facade 代码 **看起来一样** 却 **仍然值得** 的原因。
+新增风控校验 → **只改** `CheckoutFacade.PlaceOrder` 一处；各入口 **都不改**。
 
 
 ## 适用场景
@@ -219,58 +162,6 @@ worker := &OrderRetryWorker{checkout: facade}
 
 ## 实践
 
-### 薄外观 vs 应用服务
-
-在 DDD / 整洁架构里，**Application Service** 与 Facade **角色重合**：编排用例、无核心业务规则。约定：
-
-- **Facade / Application Service**：校验输入形状、调领域服务、调基础设施、发领域事件。
-- **Domain**：`OrderLine.Validate`、`PricingEngine` 的满减规则。
-- **Infrastructure**：`OrderRepository` 的 SQL、`PaymentProcessor` 的 HTTP。
-
-```go
-// 领域：单行校验仍在 OrderLine（组合/装饰/叶子）
-// 应用：Facade 只负责「何时调 Validate」
-if err := f.validator.Validate(lines); err != nil { ... }
-```
-
-把 `Validate` 循环抽成 `OrderValidator` 子系统，Facade 更薄。
-
-### 与适配器、桥接、装饰叠加
-
-组装层构造 Facade 时，子系统可以是 **已包装** 的实现：
-
-```go
-pay := RetryProcessor{
-    Inner: NewStripeAdapter(StripeClient{}, cfg.CustomerID),
-    MaxRetries: 3,
-}
-facade := NewCheckoutFacade(inv, pricing, pay, orders, notify, invoice, audit)
-```
-
-- [适配器](/cs-fundamentals/design-patterns/adapter)：`pay` 字段类型仍是 `PaymentProcessor`。
-- [桥接](/cs-fundamentals/design-patterns/bridge)：`CheckoutAPI` 管支付 **请求形态**，Facade 管 **整单用例**——可并存：Facade 内部 `payment.Pay` 委托给 `InstallmentCheckoutAPI`。
-- [装饰器](/cs-fundamentals/design-patterns/decorator)：`RetryProcessor` 装饰支付，不影响 Facade 接口。
-
-### 异步与「尽力而为」步骤
-
-通知、发票、审计 **失败后是否回滚整单** 是业务决策。常见做法：
-
-```go
-if err := f.orders.Save(ctx, order); err != nil {
-    _ = f.payment.Refund(orderID)
-    _ = f.inventory.Release(lines)
-    return OrderResult{}, err
-}
-
-// 关键路径结束；以下失败记 metrics + 投递重试队列
-if err := f.notify.SendOrderConfirmation(orderID); err != nil {
-    log.Error("notify failed", "order", orderID, "err", err)
-    f.retryQueue.Enqueue(NotifyJob{OrderID: orderID})
-}
-```
-
-外观 **文档化** 哪些是 **强一致** 步骤、哪些是 **最终一致**，避免误以为 `PlaceOrder` 等于分布式事务。
-
 ### 多个 Facade 划分边界
 
 按 **用例** 拆，而不是一个 Facade 包全站：
@@ -283,60 +174,160 @@ if err := f.notify.SendOrderConfirmation(orderID); err != nil {
 
 客户端只依赖需要的 Facade；子系统可在多个 Facade 间 **共享**。
 
-### 与中介者的区别
-
-| | 外观 | 中介者 |
-| :--- | :--- | :--- |
-| 方向 | **单向**：Client → Facade → Subsystems | **多向**：同事类 ↔ Mediator ↔ 同事类 |
-| 目的 | 简化 **外部** 使用 | 减少 **内部** 同事类之间的直接引用 |
-| 例子 | `PlaceOrder` 调六个服务 | 对话框里列表与详情面板通过 Mediator 同步选中项 |
-
-电商里 **下单编排** 是典型外观；**购物车 UI 组件互斥** 更像中介者。
-
 ### 测试策略
 
-```go
-func TestCheckoutFacade_PayFailsReleasesInventory(t *testing.T) {
-    inv := &fakeInventory{}
-    pay := &fakePayment{err: errors.New("declined")}
-    f := NewCheckoutFacade(inv, fakePricing{}, pay, fakeOrders{}, noopNotify{}, noopInvoice{}, noopAudit{})
+Facade 单测 **不测** SQL、HTTP、满减规则——那些在各子系统自己的测试里覆盖。Facade 只测 **用例编排**：**调用顺序**、**失败时是否补偿**、**成功时是否短路**。
 
-    _, err := f.PlaceOrder(context.Background(), sampleRequest())
-    if err == nil {
-        t.Fatal("expected error")
+| 测什么 | 在哪测 | 手段 |
+| :--- | :--- | :--- |
+| 库存算法、支付签名、SQL | 各 Subsystem 包 | 真实逻辑 + 集成测 |
+| 预占 → 支付 → 落库顺序；支付失败 Release；落库失败 Refund+Release | `checkout_facade_test.go` | **Fake** 子系统，记录调用了谁 |
+| HTTP 绑参、鉴权 | Controller 包 | mock `OrderCheckout` 接口 |
+| 全链路 | e2e | 真实或 testcontainer |
+
+**Fake 要点**：实现与 Facade 相同的四个接口，用 **布尔 / 计数 / 切片** 记录「是否被调用、调用顺序、传入的 orderID」——不必模拟真实业务。
+
+```go
+type fakeInventory struct {
+    reserveErr error
+    released   bool
+}
+
+func (f *fakeInventory) Reserve([]OrderLine) error { return f.reserveErr }
+func (f *fakeInventory) Release([]OrderLine) error {
+    f.released = true
+    return nil
+}
+
+type fakePayment struct {
+    payErr    error
+    refunded  bool
+    refundID  string
+}
+
+func (f *fakePayment) Pay(order Order) error { return f.payErr }
+func (f *fakePayment) Refund(orderID string) error {
+    f.refunded = true
+    f.refundID = orderID
+    return nil
+}
+
+type fakeOrders struct {
+    saveErr error
+    saved   bool
+}
+
+func (fakeOrders) NextID() string { return "ord-1" }
+func (f *fakeOrders) Save(context.Context, Order) error {
+    f.saved = true
+    return f.saveErr
+}
+
+type fakePricing struct{}
+
+func (fakePricing) Total([]OrderLine) int64 { return 9900 }
+```
+
+用 **表驱动** 覆盖编排分支——每个 case 注入不同的 fake，断言 **副作用** 而非 error 字符串：
+
+```go
+func TestCheckoutFacade_PlaceOrder(t *testing.T) {
+    lines := []OrderLine{{SKU: "tea-001", Quantity: 1}}
+    req := PlaceOrderRequest{Lines: lines, UserID: "u1"}
+
+    tests := []struct {
+        name       string
+        inv        *fakeInventory
+        pay        *fakePayment
+        orders     *fakeOrders
+        wantErr    bool
+        wantID     string
+        wantSaved  bool
+        wantRefund bool
+        wantRelease bool
+    }{
+        {
+            name:      "happy path",
+            inv:       &fakeInventory{},
+            pay:       &fakePayment{},
+            orders:    &fakeOrders{},
+            wantID:    "ord-1",
+            wantSaved: true,
+        },
+        {
+            name:        "pay fails releases inventory",
+            inv:         &fakeInventory{},
+            pay:         &fakePayment{payErr: errors.New("declined")},
+            orders:      &fakeOrders{},
+            wantErr:     true,
+            wantRelease: true,
+        },
+        {
+            name:        "save fails refunds and releases",
+            inv:         &fakeInventory{},
+            pay:         &fakePayment{},
+            orders:      &fakeOrders{saveErr: errors.New("db down")},
+            wantErr:     true,
+            wantRefund:  true,
+            wantRelease: true,
+        },
+        {
+            name:    "reserve fails short-circuits",
+            inv:     &fakeInventory{reserveErr: errors.New("oos")},
+            pay:     &fakePayment{},
+            orders:  &fakeOrders{},
+            wantErr: true,
+            // Pay / Save 不应被调用——可在 fakePayment 里加 called 字段断言
+        },
     }
-    if !inv.released {
-        t.Fatal("expected inventory release on pay failure")
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            f := CheckoutFacade{
+                inventory: tt.inv,
+                pricing:   fakePricing{},
+                payment:   tt.pay,
+                orders:    tt.orders,
+            }
+            id, err := f.PlaceOrder(context.Background(), req)
+
+            if tt.wantErr && err == nil {
+                t.Fatal("expected error")
+            }
+            if !tt.wantErr && err != nil {
+                t.Fatalf("unexpected error: %v", err)
+            }
+            if id != tt.wantID {
+                t.Fatalf("order id: got %q want %q", id, tt.wantID)
+            }
+            if tt.orders.saved != tt.wantSaved {
+                t.Fatalf("saved: got %v want %v", tt.orders.saved, tt.wantSaved)
+            }
+            if tt.pay.refunded != tt.wantRefund {
+                t.Fatalf("refunded: got %v want %v", tt.pay.refunded, tt.wantRefund)
+            }
+            if tt.inv.released != tt.wantRelease {
+                t.Fatalf("released: got %v want %v", tt.inv.released, tt.wantRelease)
+            }
+        })
     }
 }
 ```
 
-子系统 **各自** 单测；Facade 单测 **编排与补偿**；端到端再测一条 happy path。
+**Controller 层** 不必再 fake 四个子系统——依赖 `OrderCheckout` 接口，注入只返回固定值的 `fakeCheckout` 即可；HTTP 编解码另写小测试。
 
-### 可选 Facade 接口
+**常见误区**：在 Facade 测试里断言 `Total()` 算出来是 9900——那是 `PricingEngine` 的职责；Facade 测试只需 `pricing` 被调用过（若需严格顺序，可在 fake 里 append 调用日志再 `cmp.Diff`）。
 
-便于 mock 与多实现：
+## 关联
 
-```go
-type OrderCheckout interface {
-    PlaceOrder(ctx context.Context, req PlaceOrderRequest) (OrderResult, error)
-}
-
-var _ OrderCheckout = CheckoutFacade{}
-```
-
-控制器依赖 `OrderCheckout`，测试注入 `fakeCheckoutFacade`。
-
-## 小结
-
-记住这四点即可：
-
-1. **教材三条是一回事**：降耦合、简操作、藏细节——都是让客户端 **少直接碰多个子系统**；多入口时额外体现为 **编排 DRY**。
-2. **「复杂」= 用起来复杂**：子系统多、步骤多、客户端要学得多；**不是** 单步算法难，Facade 也 **不** 让编排代码消失，只是 **挪到 Facade、对客户端隐藏**。
-3. **外观要薄**：领域规则在子系统；Facade 管 **协作顺序**，别变上帝类。
-4. **别与适配器混淆**：适配器 **翻译一个** 接口；外观 **聚合多个** 子系统成 **一个** 用例入口。
-
-[装饰器模式](/cs-fundamentals/design-patterns/decorator) 统一了 **单行上的可选增强**；外观模式统一了 **下单用例的编排写在哪**。放回电商订单系统：明细结构与计价增强就绪后，**同一段**「预占 → 支付 → 落库 → 补偿」不必在 HTTP、后台、重试 worker 里各抄一遍——放进 `CheckoutFacade`，上层只调 `PlaceOrder`。当批量导出或对账时 **同一 SKU 元数据在内存中重复出现**，下一篇 [享元模式](/cs-fundamentals/design-patterns/flyweight) 说明如何分离内部状态与外部状态并按 SKU 共享。
+- 外观模式为现有对象定义了一个新接口，[适配器模式](/cs-fundamentals/design-patterns/adapter) 则会试图运用已有的接口。适配器通常只封装一个对象，外观通常会作用于整个对象子系统上。
+- 当只需对客户端代码隐藏子系统创建对象的方式时，你可以使用 [抽象工厂模式](/cs-fundamentals/design-patterns/abstract-factory) 来代替外观。
+- [享元模式](/cs-fundamentals/design-patterns/flyweight) 展示了如何生成大量的小型对象，外观则展示了如何用一个对象来代表整个子系统。
+- 外观和 [中介者模式](/cs-fundamentals/design-patterns/mediator) 的职责类似：它们都尝试在大量紧密耦合的类中组织起合作。
+  - 外观为子系统中的所有对象定义了一个简单接口，但是它不提供任何新功能。子系统本身不会意识到外观的存在。子系统中的对象可以直接进行交流。
+  - 中介者将系统中组件的沟通行为中心化。各组件只知道中介者对象，无法直接相互交流。
+- 外观类通常可以转换为 [单例模式](/cs-fundamentals/design-patterns/singleton) 类，因为在大部分情况下一个外观对象就足够了。
+- 外观与 [代理模式](/cs-fundamentals/design-patterns/proxy) 的相似之处在于它们都缓存了一个复杂实体并自行对其进行初始化。代理与其服务对象遵循同一接口，使得自己和服务对象可以互换，在这一点上它与外观不同。
 
 ## 参考阅读
 
