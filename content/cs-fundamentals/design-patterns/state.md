@@ -36,45 +36,27 @@ func (s *OrderService) Pay(ctx context.Context, orderID string) error {
 
 ## 解决方案
 
-定义 **State** 接口；**Order**（Context）保存数据 + 当前 State，**委托** 操作；各 **ConcreteState** 实现 **允许/拒绝/迁移**。
+定义 **State** 接口；**Order**（Context）持有当前 State 并 **委托** 操作；各 **ConcreteState** 决定 **允许 / 拒绝 / 迁移**。
 
-### 状态（State）接口
+### 状态与上下文
 
 ```go
 type OrderState interface {
     Pay(ctx context.Context, o *Order) error
     Ship(ctx context.Context, o *Order, tracking string) error
     Cancel(ctx context.Context, o *Order) error
-    Refund(ctx context.Context, o *Order) error
-    AdjustLines(ctx context.Context, o *Order, lines []OrderLine) error
     Name() string
 }
-```
 
-可按 **接口隔离** 拆成 `Payable`、`Cancellable`——文档为清晰保留 **统一 State**（非法操作 **返回 ErrNotAllowed**）。
-
-### 上下文（Context）——Order
-
-```go
 type Order struct {
-    ID           string
-    UserID       string
-    Lines        []OrderLine
-    CrossBorder  bool
-    TrackingNo   string
-    state        OrderState
-    repo         OrderRepository
-    publisher    EventPublisher
-    payment      PaymentService
-    inventory    InventoryService
-}
-
-func (o *Order) setState(s OrderState) {
-    o.state = s
-}
-
-func (o *Order) Status() string {
-    return o.state.Name()
+    ID, UserID  string
+    Lines       []OrderLine
+    TrackingNo  string
+    CrossBorder bool
+    state       OrderState
+    repo       OrderRepository
+    payment    PaymentService
+    inventory  InventoryService
 }
 
 func (o *Order) Total() int64 {
@@ -85,54 +67,18 @@ func (o *Order) Total() int64 {
     return sum
 }
 
-func (o *Order) Pay(ctx context.Context) error {
-    return o.state.Pay(ctx, o)
-}
+func (o *Order) Pay(ctx context.Context) error    { return o.state.Pay(ctx, o) }
+func (o *Order) Ship(ctx context.Context, t string) error { return o.state.Ship(ctx, o, t) }
+func (o *Order) Cancel(ctx context.Context) error { return o.state.Cancel(ctx, o) }
+func (o *Order) Status() string                   { return o.state.Name() }
 
-func (o *Order) Ship(ctx context.Context, tracking string) error {
-    return o.state.Ship(ctx, o, tracking)
-}
-
-func (o *Order) Cancel(ctx context.Context) error {
-    return o.state.Cancel(ctx, o)
-}
-
-func (o *Order) persist(ctx context.Context) error {
-    return o.repo.Save(ctx, o)
-}
-
-func (o *Order) publish(ctx context.Context, ev DomainEvent) {
-    if o.publisher != nil {
-        _ = o.publisher.Publish(ctx, ev)
-    }
-}
-
-// 从 DB 加载时按 persisted status 还原 State 对象
-func RestoreOrder(row OrderRow, deps OrderDeps) *Order {
-    o := &Order{ID: row.ID, Lines: row.Lines, repo: deps.Repo, /* … */}
-    o.setState(stateFromName(row.Status))
-    return o
-}
-
-func stateFromName(name string) OrderState {
-    switch name {
-    case "pending":
-        return PendingState{}
-    case "paid":
-        return PaidState{}
-    case "shipped":
-        return ShippedState{}
-    case "cancelled":
-        return CancelledState{}
-    default:
-        return PendingState{}
-    }
-}
+func (o *Order) setState(s OrderState) { o.state = s }
+func (o *Order) persist(ctx context.Context) error { return o.repo.Save(ctx, o) }
 ```
 
-**持久化** 仍存 **status 字符串**；**内存中** 是 **State 对象**——`RestoreOrder` **重建多态**。
+DB 仍存 **status 字符串**；加载时用 `stateFromName(row.Status)` 还原 State 对象。
 
-### 具体状态：待支付（PendingState）
+### 具体状态
 
 ```go
 type PendingState struct{}
@@ -144,147 +90,55 @@ func (PendingState) Pay(ctx context.Context, o *Order) error {
         return err
     }
     o.setState(PaidState{})
-    if err := o.persist(ctx); err != nil {
-        return err
-    }
-    o.publish(ctx, OrderPaid{OrderID: o.ID, UserID: o.UserID, Amount: o.Total()})
-    return nil
-}
-
-func (PendingState) Ship(ctx context.Context, o *Order, _ string) error {
-    return ErrMustPayFirst
-}
-
-func (PendingState) Cancel(ctx context.Context, o *Order) error {
-    if err := o.inventory.Release(ctx, o.Lines); err != nil {
-        return err
-    }
-    o.setState(CancelledState{})
-    if err := o.persist(ctx); err != nil {
-        return err
-    }
-    o.publish(ctx, OrderCancelled{OrderID: o.ID})
-    return nil
-}
-
-func (PendingState) Refund(context.Context, *Order) error {
-    return ErrNotPaid
-}
-
-func (PendingState) AdjustLines(ctx context.Context, o *Order, lines []OrderLine) error {
-    o.Lines = lines
     return o.persist(ctx)
 }
-```
 
-### 具体状态：已支付（PaidState）
+func (PendingState) Ship(context.Context, *Order, string) error { return ErrMustPayFirst }
 
-```go
+func (PendingState) Cancel(ctx context.Context, o *Order) error {
+    _ = o.inventory.Release(ctx, o.Lines)
+    o.setState(CancelledState{})
+    return o.persist(ctx)
+}
+
 type PaidState struct{}
 
 func (PaidState) Name() string { return "paid" }
 
-func (PaidState) Pay(context.Context, *Order) error {
-    return ErrAlreadyPaid
-}
+func (PaidState) Pay(context.Context, *Order) error { return ErrAlreadyPaid }
 
 func (PaidState) Ship(ctx context.Context, o *Order, tracking string) error {
     o.TrackingNo = tracking
     o.setState(ShippedState{})
-    if err := o.persist(ctx); err != nil {
-        return err
-    }
-    o.publish(ctx, OrderShipped{OrderID: o.ID, TrackingNo: tracking})
-    return nil
+    return o.persist(ctx)
 }
 
 func (PaidState) Cancel(ctx context.Context, o *Order) error {
-    if err := o.payment.Refund(ctx, o.ID); err != nil {
-        return err
-    }
-    if err := o.inventory.Release(ctx, o.Lines); err != nil {
-        return err
-    }
+    _ = o.payment.Refund(ctx, o.ID)
+    _ = o.inventory.Release(ctx, o.Lines)
     o.setState(CancelledState{})
-    if err := o.persist(ctx); err != nil {
-        return err
-    }
-    o.publish(ctx, OrderCancelled{OrderID: o.ID})
-    return nil
-}
-
-func (PaidState) Refund(ctx context.Context, o *Order) error {
-    return PaidState{}.Cancel(ctx, o) // 或独立 RefundingState
-}
-
-func (s PaidState) AdjustLines(ctx context.Context, o *Order, lines []OrderLine) error {
-    if o.CrossBorder {
-        return ErrCrossBorderPaidEdit
-    }
-    o.Lines = lines
-    return o.persist(ctx)
-}
-```
-
-### 具体状态：已发货 / 已取消（节选）
-
-```go
-type ShippedState struct{}
-
-func (ShippedState) Name() string { return "shipped" }
-
-func (ShippedState) Pay(context.Context, *Order) error    { return ErrAlreadyPaid }
-func (ShippedState) Cancel(context.Context, *Order) error  { return ErrCannotCancelShipped }
-func (ShippedState) AdjustLines(context.Context, *Order, []OrderLine) error {
-    return ErrNotEditable
-}
-
-func (ShippedState) Ship(ctx context.Context, o *Order, tracking string) error {
-    o.TrackingNo = tracking // 改运单号
     return o.persist(ctx)
 }
 
-type CancelledState struct{}
-
-func (CancelledState) Name() string { return "cancelled" }
-
-func (CancelledState) Pay(context.Context, *Order) error    { return ErrOrderCancelled }
-func (CancelledState) Ship(context.Context, *Order, string) error { return ErrOrderCancelled }
-func (CancelledState) Cancel(context.Context, *Order) error { return ErrOrderCancelled }
-func (CancelledState) Refund(context.Context, *Order) error { return ErrOrderCancelled }
-func (CancelledState) AdjustLines(context.Context, *Order, []OrderLine) error {
-    return ErrOrderCancelled
-}
+type ShippedState struct{}   // 已发货：Cancel 等操作返回 ErrNotAllowed
+type CancelledState struct{} // 终态：所有写操作拒绝
 ```
 
-**终态** `CancelledState` **所有写操作拒绝**——规则 **集中在一处**。
+`ShippedState` / `CancelledState` 等 **终态或只读态** 在各自 struct 里统一 `return ErrNotAllowed`；改明细、退款等操作同理扩展接口。
 
-### 客户端——OrderService 只加载并委托
+### 客户端
 
 ```go
-type OrderService struct {
-    repo OrderRepository
-    deps OrderDeps
-}
-
 func (s *OrderService) Pay(ctx context.Context, orderID string) error {
-    o, err := s.load(ctx, orderID)
+    o, err := s.load(ctx, orderID) // RestoreOrder + stateFromName
     if err != nil {
         return err
     }
     return o.Pay(ctx)
 }
-
-func (s *OrderService) load(ctx context.Context, id string) (*Order, error) {
-    row, err := s.repo.Get(ctx, id)
-    if err != nil {
-        return nil, err
-    }
-    return RestoreOrder(row, s.deps), nil
-}
 ```
 
-HTTP、MQ、CLI **统一** `order.Pay()`——**无 switch**。
+HTTP、MQ、CLI **统一** `order.Pay()`，**无 switch**。迁移后 `Publish` 领域事件、表驱动 FSM、`AdjustLines` 等见 **实践** 一节。
 
 
 ## 适用场景
@@ -324,23 +178,36 @@ HTTP、MQ、CLI **统一** `order.Pay()`——**无 switch**。
 
 ## 实践
 
-> **阅读提示**：先掌握「**Order 委托 state.Pay，PaidState 内迁移**」即可。本节是工程变体；初学可先跳过。
+### Restore 与终态
 
-### 与观察者、命令组合
+```go
+func stateFromName(name string) OrderState {
+    switch name {
+    case "pending":
+        return PendingState{}
+    case "paid":
+        return PaidState{}
+    case "shipped":
+        return ShippedState{}
+    case "cancelled":
+        return CancelledState{}
+    default:
+        return PendingState{}
+    }
+}
 
-```text
-PendingState.Pay
-  → payment.Capture
-  → setState(PaidState)
-  → persist
-  → publish(OrderPaid)     // 观察者扇出
+type ShippedState struct{}
 
-AdjustQuantityCommand.Execute
-  → order.AdjustLines(...)  // 经 State 校验
-  → PendingState / PaidState 允许或拒绝
+func (ShippedState) Name() string { return "shipped" }
+func (ShippedState) Pay(context.Context, *Order) error { return ErrAlreadyPaid }
+func (ShippedState) Cancel(context.Context, *Order) error { return ErrCannotCancelShipped }
+func (ShippedState) Ship(ctx context.Context, o *Order, tracking string) error {
+    o.TrackingNo = tracking
+    return o.persist(ctx)
+}
 ```
 
-[命令](/cs-fundamentals/design-patterns/command) **不替代** State——Command 问 **Receiver**；Receiver（Order）**再问当前 State**。
+迁移成功后 `Publish(OrderPaid)`；`AdjustLines`、`Refund` 按状态扩展接口。
 
 ### 表驱动 FSM（状态很多时）
 
@@ -372,79 +239,12 @@ func (o *Order) Apply(ctx context.Context, event string) error {
 
 **运营可配置** 时用表；**行为差异大**（Paid Cancel 要退款链）仍用 **多态 State** 或 **表 + 钩子**。
 
-### State 持有 Context 引用？
+## 关联
 
-GoF 允许 State **反向引用 Context** 以 `Transition`——本文 **State 方法收 `*Order`**，避免 **双向引用循环**；迁移用 **`o.setState`**。
-
-### 部分发货（PartialShippedState）
-
-```go
-type PartialShippedState struct{ ShippedSKUs map[string]int }
-
-func (s PartialShippedState) Ship(ctx context.Context, o *Order, tracking string) error {
-    // 多次 Ship 直至全发完 → ShippedState
-    if allLinesShipped(o, s.ShippedSKUs) {
-        o.setState(ShippedState{})
-    }
-    return o.persist(ctx)
-}
-```
-
-**新状态** = **新 struct**，不改 `PaidState` 里 **嵌套 if partial**。
-
-### 与外观、责任链
-
-- [外观](/cs-fundamentals/design-patterns/facade) `PlaceOrder`：**创建** Pending 订单 → `order.Pay`（或支付子步骤）——Facade **编排**；State **管单订单生命周期**。
-- [责任链](/cs-fundamentals/design-patterns/chain-of-responsibility) **下单前校验**；State **下单后** 状态机——**时间线不同**。
-
-### 持久化与并发
-
-| 问题 | 做法 |
-| :--- | :--- |
-| **乐观锁** | `UPDATE … WHERE status=pending`；失败 = **并发已迁移** |
-| **Restore** | 读 DB status → `stateFromName` |
-| **禁止绕过** | 禁止 **直接改** `order.status` 字段；只 **`setState`** |
-
-### 测试策略
-
-```go
-func TestPendingState_PayTransitionsToPaid(t *testing.T) {
-    o := &Order{ID: "o1", state: PendingState{}, payment: fakePayOK{}}
-    if err := o.Pay(context.Background()); err != nil {
-        t.Fatal(err)
-    }
-    if o.Status() != "paid" {
-        t.Fatal(o.Status())
-    }
-}
-
-func TestShippedState_CancelRejected(t *testing.T) {
-    o := &Order{state: ShippedState{}}
-    err := o.Cancel(context.Background())
-    if !errors.Is(err, ErrCannotCancelShipped) {
-        t.Fatal(err)
-    }
-}
-
-func TestPaidState_CrossBorderAdjustRejected(t *testing.T) {
-    o := &Order{state: PaidState{}, CrossBorder: true}
-    err := o.AdjustLines(context.Background(), o, nil)
-    if !errors.Is(err, ErrCrossBorderPaidEdit) {
-        t.Fatal(err)
-    }
-}
-```
-
-## 小结
-
-记住这四点即可：
-
-1. **行为随状态变**：`order.Pay()` **委托** `state.Pay()`——**无外部 switch**。
-2. **迁移在 State 内**：`PaidState.Ship` → `setState(ShippedState{})` + `persist`。
-3. **与观察者分层**：State **管规则与迁移**；**Publish** 交 [观察者](/cs-fundamentals/design-patterns/observer) 扇出。
-4. **Restore 重建多态**：DB 存 enum；加载时 **`stateFromName`**。
-
-[观察者模式](/cs-fundamentals/design-patterns/observer) 解决了 **「状态变完之后通知谁」**；状态模式解决 **「在此状态下能做什么、做完变成什么态」**——把 **生命周期规则** 从 **散落条件分支** 收到 **可扩展的状态类**，让订单、工单等在规则频繁变化时仍符合 [开闭](/cs-fundamentals/design-patterns#设计原则) 与 **单一职责**。
+- [桥接模式](/cs-fundamentals/design-patterns/bridge)、状态模式、[策略模式](/cs-fundamentals/design-patterns/strategy)（以及在一定程度上 [适配器模式](/cs-fundamentals/design-patterns/adapter)）的接口结构很相似——都基于 [组合模式](/cs-fundamentals/design-patterns/composite) 式的委托，但各自要解决的问题不同。模式不仅是代码组织方式，也是与同伴讨论 **如何解题** 的共同语言。
+- 状态模式是 [策略模式](/cs-fundamentals/design-patterns/strategy) 的扩展。两者都基于组合机制：它们都通过将部分工作委派给「帮手」对象来在运行时改变行为。还有一个相似之处在于——对客户端而言，它们都是透明的。客户端与多种状态的「策略」对象交互时，通常不会察觉到这一点。
+  - 策略模式会让各个策略对象相互完全独立，彼此之间没有任何联系。
+  - 状态模式不会限制具体状态之间的依赖，并允许它们自行改变在不同状态间进行切换。
 
 ## 参考阅读
 

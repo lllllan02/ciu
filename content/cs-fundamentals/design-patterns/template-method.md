@@ -29,9 +29,9 @@ func (s *AppCheckout) PlaceOrder(ctx context.Context, req PlaceOrderRequest) err
 
 ## 解决方案
 
-定义 **PlaceOrderTemplate**（抽象类/基 struct）；**模板方法** `PlaceOrder` 按序调 **primitive + hook**；**AppCheckout**、**B2BCheckout** **只覆写钩子**。
+定义 **CheckoutTemplate**；**模板方法** `PlaceOrder` 固定 **预占→计价→收款→落库** 顺序与失败补偿；可变步骤通过 **CheckoutHooks** 注入——Go 无 Java 式子类多态覆写，**Hooks 接口** 是地道写法（嵌入 struct 的局限见 **实践**）。
 
-### 钩子与上下文
+### 钩子与模板
 
 ```go
 type PlaceOrderRequest struct {
@@ -39,7 +39,6 @@ type PlaceOrderRequest struct {
     Lines     []OrderLine
     Channel   string
     AccountID string // B2B
-    Currency  string // 跨境
 }
 
 type CheckoutDeps struct {
@@ -49,7 +48,6 @@ type CheckoutDeps struct {
     Credit    CreditService
     Orders    OrderRepository
     Notify    NotificationService
-    PreCheck  OrderHandler // 责任链链头
 }
 
 type placeCtx struct {
@@ -57,99 +55,7 @@ type placeCtx struct {
     amount  int64
     orderID string
 }
-```
 
-### 抽象模板与模板方法
-
-```go
-type CheckoutTemplate struct {
-    deps CheckoutDeps
-}
-
-// 模板方法：顺序固定，子类不应覆写（Go：导出但文档禁止 override）
-func (t *CheckoutTemplate) PlaceOrder(ctx context.Context, req PlaceOrderRequest) (string, error) {
-    pc := &placeCtx{req: req}
-
-    if err := t.prePlace(ctx, pc); err != nil {
-        return "", err
-    }
-    if err := t.deps.Inventory.Reserve(ctx, req.Lines); err != nil {
-        return "", err
-    }
-    pc.amount = t.deps.Pricing.Total(ctx, PricingContext{
-        Order: Order{Lines: req.Lines}, User: req.User, Channel: req.Channel,
-    })
-
-    if err := t.collectPayment(ctx, pc); err != nil {
-        _ = t.deps.Inventory.Release(ctx, req.Lines)
-        return "", err
-    }
-    orderID, err := t.deps.Orders.Save(ctx, req)
-    if err != nil {
-        t.rollbackPayment(ctx, pc)
-        _ = t.deps.Inventory.Release(ctx, req.Lines)
-        return "", err
-    }
-    pc.orderID = orderID
-
-    if err := t.afterPlace(ctx, pc); err != nil {
-        return orderID, err // 订单已落库：after 失败常记录日志，不 rollback 主单
-    }
-    return orderID, nil
-}
-
-// —— 钩子与可覆写原语 —— //
-
-func (t *CheckoutTemplate) prePlace(ctx context.Context, pc *placeCtx) error {
-    return nil // 默认无额外前置
-}
-
-func (t *CheckoutTemplate) collectPayment(ctx context.Context, pc *placeCtx) error {
-    return t.deps.Payment.Pay(ctx, pc.req.User.ID, pc.amount)
-}
-
-func (t *CheckoutTemplate) rollbackPayment(ctx context.Context, pc *placeCtx) {
-    _ = t.deps.Payment.Refund(ctx, pc.req.User.ID, pc.amount)
-}
-
-func (t *CheckoutTemplate) afterPlace(ctx context.Context, pc *placeCtx) error {
-    return nil
-}
-```
-
-**补偿** `Release` / `Refund` **写在骨架里**——子类 **不能忘**。
-
-### 具体类：App 下单
-
-```go
-type AppCheckout struct {
-    CheckoutTemplate
-}
-
-func NewAppCheckout(deps CheckoutDeps) *AppCheckout {
-    return &AppCheckout{CheckoutTemplate: CheckoutTemplate{deps: deps}}
-}
-
-func (c *AppCheckout) prePlace(ctx context.Context, pc *placeCtx) error {
-    return c.deps.PreCheck.Handle(ctx, &PlaceOrderContext{Req: pc.req})
-}
-
-func (c *AppCheckout) afterPlace(ctx context.Context, pc *placeCtx) error {
-    return c.deps.Notify.SendSMS(ctx, pc.req.User.ID, pc.orderID)
-}
-```
-
-嵌入 `CheckoutTemplate` 后，`AppCheckout.PlaceOrder` **提升为外层方法**——实际 Go 中 **显式委托** 更清晰：
-
-```go
-func (c *AppCheckout) PlaceOrder(ctx context.Context, req PlaceOrderRequest) (string, error) {
-    return c.CheckoutTemplate.PlaceOrder(ctx, req) // 钩子多态靠嵌入 shadow
-}
-```
-
-Go 嵌入 **不自动多态覆写** 父 struct 方法内的 `t.prePlace`——**模板内应调接口** 或 **Hooks 字段**。工程上常用 **Hooks 接口**：
-
-```go
 type CheckoutHooks interface {
     PrePlace(ctx context.Context, pc *placeCtx) error
     CollectPayment(ctx context.Context, pc *placeCtx) error
@@ -166,24 +72,48 @@ func (t *CheckoutTemplate) PlaceOrder(ctx context.Context, req PlaceOrderRequest
     if err := t.hooks.PrePlace(ctx, pc); err != nil {
         return "", err
     }
-    // … Reserve …
+    if err := t.deps.Inventory.Reserve(ctx, req.Lines); err != nil {
+        return "", err
+    }
+    pc.amount = t.deps.Pricing.Total(ctx, PricingContext{
+        Order: Order{Lines: req.Lines}, User: req.User, Channel: req.Channel,
+    })
     if err := t.hooks.CollectPayment(ctx, pc); err != nil {
         _ = t.deps.Inventory.Release(ctx, req.Lines)
         return "", err
     }
-    // … Save、rollback、AfterPlace …
-    return pc.orderID, nil
+    orderID, err := t.deps.Orders.Save(ctx, req)
+    if err != nil {
+        _ = t.deps.Payment.Refund(ctx, pc.req.User.ID, pc.amount)
+        _ = t.deps.Inventory.Release(ctx, req.Lines)
+        return "", err
+    }
+    pc.orderID = orderID
+    if err := t.hooks.AfterPlace(ctx, pc); err != nil {
+        return orderID, err // 已落库：after 失败常记日志，不 rollback 主单
+    }
+    return orderID, nil
 }
 ```
 
-下文 **B2B** 用 **Hooks 实现**（Go **地道** 写法）。
+**Release / Refund 补偿写在骨架里**——子类 **不能忘**。
 
-### 具体 Hooks：B2B 代客下单
+### 具体钩子
 
 ```go
-type B2BHooks struct {
-    deps CheckoutDeps
+type AppHooks struct{ deps CheckoutDeps }
+
+func (AppHooks) PrePlace(context.Context, *placeCtx) error { return nil }
+
+func (h AppHooks) CollectPayment(ctx context.Context, pc *placeCtx) error {
+    return h.deps.Payment.Pay(ctx, pc.req.User.ID, pc.amount)
 }
+
+func (h AppHooks) AfterPlace(ctx context.Context, pc *placeCtx) error {
+    return h.deps.Notify.SendSMS(ctx, pc.req.User.ID, pc.orderID)
+}
+
+type B2BHooks struct{ deps CheckoutDeps }
 
 func (h B2BHooks) PrePlace(ctx context.Context, pc *placeCtx) error {
     return validatePO(ctx, pc.req)
@@ -196,60 +126,24 @@ func (h B2BHooks) CollectPayment(ctx context.Context, pc *placeCtx) error {
 func (h B2BHooks) AfterPlace(ctx context.Context, pc *placeCtx) error {
     return h.deps.Notify.SendEmail(ctx, pc.req.AccountID, pc.orderID)
 }
-
-func NewB2BCheckout(deps CheckoutDeps) *CheckoutTemplate {
-    return &CheckoutTemplate{deps: deps, hooks: B2BHooks{deps: deps}}
-}
 ```
 
-### 具体 Hooks：跨境站
+跨境合规校验、FX 支付、落库后审计日志等 **再实现一套 Hooks**，套路相同。
+
+### 选择与组装
 
 ```go
-type CrossBorderHooks struct {
-    deps       CheckoutDeps
-    compliance ComplianceService
-}
-
-func (h CrossBorderHooks) PrePlace(ctx context.Context, pc *placeCtx) error {
-    if err := h.deps.PreCheck.Handle(ctx, &PlaceOrderContext{Req: pc.req}); err != nil {
-        return err
-    }
-    return h.compliance.Verify(ctx, pc.req)
-}
-
-func (h CrossBorderHooks) CollectPayment(ctx context.Context, pc *placeCtx) error {
-    return h.deps.Payment.PayWithFX(ctx, pc.req.User.ID, pc.amount, pc.req.Currency)
-}
-
-func (h CrossBorderHooks) AfterPlace(ctx context.Context, pc *placeCtx) error {
-    _ = h.compliance.LogExport(ctx, pc.orderID)
-    return h.deps.Notify.SendEmail(ctx, pc.req.User.ID, pc.orderID)
-}
-```
-
-### 客户端——Facade 选择模板
-
-```go
-type CheckoutFacade struct {
-    app         *CheckoutTemplate
-    b2b         *CheckoutTemplate
-    crossBorder *CheckoutTemplate
-}
-
-func (f *CheckoutFacade) PlaceOrder(ctx context.Context, req PlaceOrderRequest) (string, error) {
-    switch req.Channel {
+func NewCheckout(deps CheckoutDeps, channel string) *CheckoutTemplate {
+    switch channel {
     case "b2b":
-        return f.b2b.PlaceOrder(ctx, req)
-    case "cross_border":
-        return f.crossBorder.PlaceOrder(ctx, req)
+        return &CheckoutTemplate{deps: deps, hooks: B2BHooks{deps: deps}}
     default:
-        return f.app.PlaceOrder(ctx, req)
+        return &CheckoutTemplate{deps: deps, hooks: AppHooks{deps: deps}}
     }
 }
 ```
 
-[外观](/cs-fundamentals/design-patterns/facade) **对外一个入口**；内部 **按渠道选 Template**——**Hollywood**：Controller **只调 Facade**，Facade **调模板**，模板 **调 Hooks**。
-
+对外可由 [外观](/cs-fundamentals/design-patterns/facade) `CheckoutFacade.PlaceOrder` 按 `req.Channel` 选模板——**Hollywood**：Controller **只调 Facade**，Facade **调模板**，模板 **调 Hooks**。conditional hook、责任链 PrePlace 见 **实践**。
 
 ## 适用场景
 
@@ -286,94 +180,11 @@ func (f *CheckoutFacade) PlaceOrder(ctx context.Context, req PlaceOrderRequest) 
 | **与 Facade 边界** | 团队需约定 **谁是对外 Facade、谁是内部模板** |
 | **after 失败语义** | 落库后钩子失败 **是否补偿** 要 **文档化** |
 
-## 实践
 
-> **阅读提示**：先掌握「**PlaceOrder 固定顺序，Hooks 可变步骤**」即可。本节是工程变体；初学可先跳过。
+## 关联
 
-### 与责任链、策略、观察者
-
-```text
-PlaceOrderTemplate.PlaceOrder
-  → hooks.PrePlace → preCheckChain（责任链）
-  → Pricing.Total（策略）
-  → hooks.CollectPayment
-  → Save
-  → hooks.AfterPlace → publish(OrderPlaced)（观察者，可选放 after）
-```
-
-[责任链](/cs-fundamentals/design-patterns/chain-of-responsibility) 在 **PrePlace 钩子**；[策略](/cs-fundamentals/design-patterns/strategy) 在 **计价步**；[观察者](/cs-fundamentals/design-patterns/observer) 在 **AfterPlace**——**骨架不变**。
-
-### 钩子类型
-
-| 类型 | 行为 | 例子 |
-| :--- | :--- | :--- |
-| **abstract** | 子类 **必须** 实现 | `CollectPayment`（B2B vs App 必不同） |
-| **hook（空默认）** | 可 **不覆写** | 默认 `AfterPlace` no-op |
-| **conditional hook** | 模板问 `shouldSendSMS()` | App true，B2B false |
-
-```go
-func (t *CheckoutTemplate) PlaceOrder(...) {
-    // …
-    if t.hooks.ShouldNotify() {
-        _ = t.hooks.AfterPlace(ctx, pc)
-    }
-}
-```
-
-### 模板方法 vs 生成器
-
-| | 模板方法 | [生成器](/cs-fundamentals/design-patterns/builder) |
-| :--- | :--- | :--- |
-| **目的** | **过程** 骨架复用 | **对象** 分步构建 |
-| **电商** | PlaceOrder 流水线 | 构建复杂 `PlaceOrderRequest` |
-
-可 **Builder 构建 req** → **Template PlaceOrder(req)**。
-
-### 测试：只测钩子
-
-```go
-func TestPlaceOrderTemplate_RollbackOnPayFail(t *testing.T) {
-    inv := &fakeInventory{}
-    hooks := &stubHooks{payErr: ErrDeclined}
-    tpl := &CheckoutTemplate{deps: CheckoutDeps{Inventory: inv, /* … */}, hooks: hooks}
-    _, err := tpl.PlaceOrder(context.Background(), PlaceOrderRequest{Lines: lines})
-    if err == nil || !inv.released {
-        t.Fatal("expected release on pay fail")
-    }
-}
-
-func TestB2BHooks_ChargesCredit(t *testing.T) {
-    credit := &fakeCredit{}
-    h := B2BHooks{deps: CheckoutDeps{Credit: credit}}
-    pc := &placeCtx{req: PlaceOrderRequest{AccountID: "a1"}, amount: 1000}
-    _ = h.CollectPayment(context.Background(), pc)
-    if credit.charged != 1000 {
-        t.Fatal()
-    }
-}
-```
-
-### 反模式：子类重写 PlaceOrder
-
-```go
-// 反模式：B2BCheckout 重写整条 PlaceOrder，又复制骨架
-func (b *B2BCheckout) PlaceOrder(ctx context.Context, req PlaceOrderRequest) (string, error) {
-    // 自己拼 Reserve/Pay/Save——回到「问题」一节
-}
-```
-
-**应只实现 Hooks**。
-
-## 小结
-
-记住这四点即可：
-
-1. **骨架在一处**：`PlaceOrder` 顺序与 **失败补偿** 只在 `CheckoutTemplate`。
-2. **变化在钩子**：`PrePlace`、`CollectPayment`、`AfterPlace` **按渠道实现**。
-3. **Hollywood**：渠道代码 **不自己拼 Reserve→Pay**；**模板调用 Hooks**。
-4. **与 Facade 叠加**：对外 [外观](/cs-fundamentals/design-patterns/facade) `PlaceOrder`；对内 **选 Template/Hooks**。
-
-[外观模式](/cs-fundamentals/design-patterns/facade) 解决了 **「客户端如何一次用完子系统」**；模板方法解决了 **「多个渠道共享同一条用例流水线，又不必复制粘贴」**——把 **不变算法结构** 留在 **模板方法**，把 **易变步骤** 延迟到 **钩子**，在 [开闭](/cs-fundamentals/design-patterns#设计原则) 下扩展 App / B2B / 跨境下单。
+- [工厂方法模式](/cs-fundamentals/design-patterns/factory) 是 [模板方法模式](/cs-fundamentals/design-patterns/template-method) 的一种特殊形式。同时，工厂方法可以作为一个大型模板方法中的一个步骤。
+- [模板方法模式](/cs-fundamentals/design-patterns/template-method) 基于继承机制：它允许你通过扩展子类中的部分内容来改变部分算法。[策略模式](/cs-fundamentals/design-patterns/strategy) 基于组合机制：你可以通过对相应行为提供不同的策略来改变对象的部分行为。模板方法在类层次上运作，因此它是静态的。策略在对象层次上运作，因此允许在运行时切换行为。
 
 ## 参考阅读
 

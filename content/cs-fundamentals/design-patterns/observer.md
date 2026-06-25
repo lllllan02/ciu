@@ -34,55 +34,27 @@ func (s *OrderService) MarkPaid(ctx context.Context, orderID string) error {
 
 ## 解决方案
 
-定义 **观察者** 接口；**主题** 维护订阅列表并在变更后 **Notify**；各 **具体观察者** 实现单一副作用；写状态逻辑 **只 Publish**。
+定义 **观察者** 接口；**主题** 维护订阅列表并在变更后 **Publish**；各 **具体观察者** 处理单一副作用；写状态逻辑 **只发事件**。
 
-### 领域事件与观察者接口
+### 事件与主题
 
 ```go
 type DomainEvent interface {
     EventName() string
-    OccurredAt() time.Time
 }
 
 type OrderPaid struct {
-    OrderID   string
-    UserID    string
-    Amount    int64
-    occurred  time.Time
+    OrderID, UserID string
+    Amount          int64
 }
 
-func (e OrderPaid) EventName() string    { return "order.paid" }
-func (e OrderPaid) OccurredAt() time.Time { return e.occurred }
-
-type OrderShipped struct {
-    OrderID    string
-    TrackingNo string
-    occurred   time.Time
-}
-
-func (e OrderShipped) EventName() string    { return "order.shipped" }
-func (e OrderShipped) OccurredAt() time.Time { return e.occurred }
-
-type OrderCancelled struct {
-    OrderID  string
-    occurred time.Time
-}
-
-func (e OrderCancelled) EventName() string    { return "order.cancelled" }
-func (e OrderCancelled) OccurredAt() time.Time { return e.occurred }
+func (e OrderPaid) EventName() string { return "order.paid" }
 
 type Observer interface {
-    // 返回支持的 event 名；空切片表示订阅全部（慎用）
     InterestedIn() []string
     Handle(ctx context.Context, ev DomainEvent) error
 }
-```
 
-可按 **事件名路由**，避免每个 Observer 里 **长 switch**——或用 **泛型** `Observer[OrderPaid]`（见 [实践](#实践)）。
-
-### 主题（Subject）——EventPublisher
-
-```go
 type EventPublisher struct {
     observers []Observer
 }
@@ -91,97 +63,33 @@ func (p *EventPublisher) Subscribe(o Observer) {
     p.observers = append(p.observers, o)
 }
 
-func (p *EventPublisher) Unsubscribe(o Observer) {
-    for i, x := range p.observers {
-        if x == o {
-            p.observers = append(p.observers[:i], p.observers[i+1:]...)
-            return
-        }
-    }
-}
-
 func (p *EventPublisher) Publish(ctx context.Context, ev DomainEvent) error {
     for _, o := range p.observers {
-        if !interested(o, ev.EventName()) {
-            continue
-        }
-        if err := o.Handle(ctx, ev); err != nil {
-            return err // 同步模式：任一失败可中断；异步见下文
+        for _, name := range o.InterestedIn() {
+            if name == ev.EventName() {
+                if err := o.Handle(ctx, ev); err != nil {
+                    return err
+                }
+                break
+            }
         }
     }
     return nil
 }
-
-func interested(o Observer, name string) bool {
-    for _, n := range o.InterestedIn() {
-        if n == name {
-            return true
-        }
-    }
-    return false
-}
 ```
 
-`OrderService` **注入** `EventPublisher`，**不注入** `EmailService` + `SearchIndexer` + …
-
-### 具体观察者
+### 观察者与 OrderService
 
 ```go
-type EmailNotifier struct {
-    mail EmailService
-}
+type EmailNotifier struct{ mail EmailService }
 
-func (n *EmailNotifier) InterestedIn() []string { return []string{"order.paid", "order.shipped"} }
+func (n *EmailNotifier) InterestedIn() []string { return []string{"order.paid"} }
 
 func (n *EmailNotifier) Handle(ctx context.Context, ev DomainEvent) error {
-    switch e := ev.(type) {
-    case OrderPaid:
-        return n.mail.SendPaidConfirmation(ctx, e.OrderID)
-    case OrderShipped:
-        return n.mail.SendShipped(ctx, e.OrderID, e.TrackingNo)
-    default:
-        return nil
-    }
-}
-
-type SearchIndexer struct {
-    search SearchService
-}
-
-func (n *SearchIndexer) InterestedIn() []string { return []string{"order.paid", "order.shipped", "order.cancelled"} }
-
-func (n *SearchIndexer) Handle(ctx context.Context, ev DomainEvent) error {
-    var id string
-    switch e := ev.(type) {
-    case OrderPaid:
-        id = e.OrderID
-    case OrderShipped:
-        id = e.OrderID
-    case OrderCancelled:
-        id = e.OrderID
-    default:
-        return nil
-    }
-    return n.search.IndexOrder(ctx, id)
-}
-
-type LoyaltyAccruer struct {
-    loyalty LoyaltyService
-}
-
-func (n *LoyaltyAccruer) InterestedIn() []string { return []string{"order.paid"} }
-
-func (n *LoyaltyAccruer) Handle(ctx context.Context, ev DomainEvent) error {
     e := ev.(OrderPaid)
-    return n.loyalty.AccruePoints(ctx, e.UserID, e.Amount)
+    return n.mail.SendPaidConfirmation(ctx, e.OrderID)
 }
-```
 
-新增 **直播弹幕推送** = **新 Observer + Subscribe**，**不改** `OrderService.MarkPaid`。
-
-### 发起人（Originator）——OrderService 只 Publish
-
-```go
 type OrderService struct {
     repo      OrderRepository
     publisher *EventPublisher
@@ -192,36 +100,26 @@ func (s *OrderService) MarkPaid(ctx context.Context, orderID string) error {
     if err != nil {
         return err
     }
-    if order.Status != StatusPending {
-        return ErrInvalidTransition
-    }
     order.Status = StatusPaid
     if err := s.repo.Save(ctx, order); err != nil {
         return err
     }
     return s.publisher.Publish(ctx, OrderPaid{
         OrderID: order.ID, UserID: order.UserID, Amount: order.Total,
-        occurred: time.Now(),
     })
 }
 ```
 
-**事务边界**：Save **成功后再 Publish**；若 Publish 失败，需 **Outbox / 重试**（见 [实践](#实践)）——避免 **库已改、下游未通知**。
-
-### 组装（Client）
+搜索索引、积分、审计等 **各一个 Observer**；新增下游 = `Subscribe`，**不改** `MarkPaid`。组装示例：
 
 ```go
-func NewOrderModule(/* deps */) *OrderService {
-    pub := &EventPublisher{}
-    pub.Subscribe(&EmailNotifier{mail: emailSvc})
-    pub.Subscribe(&SearchIndexer{search: searchSvc})
-    pub.Subscribe(&LoyaltyAccruer{loyalty: loyaltySvc})
-    pub.Subscribe(&AuditLogger{audit: auditSvc})
-    return &OrderService{repo: repo, publisher: pub}
-}
+pub := &EventPublisher{}
+pub.Subscribe(&EmailNotifier{mail: emailSvc})
+pub.Subscribe(&SearchIndexer{search: searchSvc})
+svc := &OrderService{repo: repo, publisher: pub}
 ```
 
-[外观](/cs-fundamentals/design-patterns/facade) `PlaceOrderCore` 在落库后 **同样 Publish** `OrderPlaced` / `OrderPaid`——**一处注册 Observer**，HTTP 与 MQ 入口 **共享**。
+`Save` **成功后再 Publish**；异步投递、Outbox、更多事件类型见 **实践** 一节。
 
 
 ## 适用场景
@@ -261,8 +159,6 @@ func NewOrderModule(/* deps */) *OrderService {
 
 ## 实践
 
-> **阅读提示**：先掌握「**Save 成功后 Publish，Observer Handle**」即可。本节是工程变体；初学可先跳过。
-
 ### 同步 vs 异步通知
 
 ```go
@@ -280,37 +176,6 @@ func (p *EventPublisher) PublishAsync(ctx context.Context, ev DomainEvent) {
 ```
 
 **写接口** 用 **Async** 避免邮件拖慢 `MarkPaid`；失败 **打日志 + 死信**，不 **return err 给调用方**（除非同步强一致）。
-
-### Transactional Outbox
-
-```text
-MarkPaid:
-  BEGIN TX
-    UPDATE orders SET status=paid
-    INSERT outbox(event=OrderPaid, payload=…)
-  COMMIT
-OutboxWorker:
-  READ outbox → Publish → DELETE
-```
-
-保证 **至少一次** 投递；Observer **幂等**（按 `OrderID+EventName` 去重）。
-
-### 与命令、外观一起用
-
-```text
-PlaceOrder（Facade）
-  → Reserve / Pay / Save
-  → publisher.Publish(OrderPlaced)
-
-AdjustQuantityCommand.Execute
-  → SetLineQuantity
-  → publisher.Publish(OrderLineChanged)
-
-OrderPaid 观察者
-  → Email / Search / Loyalty（只读扇出）
-```
-
-[命令](/cs-fundamentals/design-patterns/command) **Execute 后发事件**；[外观](/cs-fundamentals/design-patterns/facade) **用例成功后再 Publish**——**写** 与 **通知** 边界清晰。
 
 ### 类型安全订阅（Go 泛型）
 
@@ -347,59 +212,15 @@ var paidBus typedPublisher[OrderPaid]
 
 电商 **OrderPaid 带 OrderID** 通常 **推**；Observer **自己查读模型** 拿详情。
 
-### 与中介者的边界
+## 关联
 
-| 场景 | 选用 |
-| :--- | :--- |
-| 结算页 **改地址 → 刷运费**（页内、有顺序） | [中介者](/cs-fundamentals/design-patterns/mediator) |
-| **订单已支付 → 六个下游**（跨模块、事后） | **观察者** |
-| 跨模块 **弱类型** 广播 | EventBus（观察者变体） |
-
-### 测试策略
-
-```go
-func TestMarkPaid_PublishesOrderPaid(t *testing.T) {
-    pub := &EventPublisher{}
-    rec := &recordingObserver{names: []string{"order.paid"}}
-    pub.Subscribe(rec)
-    svc := &OrderService{repo: fakeRepo{}, publisher: pub}
-    _ = svc.MarkPaid(context.Background(), "o1")
-    if len(rec.events) != 1 {
-        t.Fatal("expected publish")
-    }
-}
-
-func TestEmailNotifier_OnlyPaidAndShipped(t *testing.T) {
-    mail := &fakeMail{}
-    n := &EmailNotifier{mail: mail}
-    _ = n.Handle(context.Background(), OrderCancelled{OrderID: "x"})
-    if mail.sent != 0 {
-        t.Fatal("should ignore cancelled")
-    }
-}
-
-type recordingObserver struct {
-    names   []string
-    events  []DomainEvent
-}
-
-func (r *recordingObserver) InterestedIn() []string { return r.names }
-func (r *recordingObserver) Handle(_ context.Context, ev DomainEvent) error {
-    r.events = append(r.events, ev)
-    return nil
-}
-```
-
-## 小结
-
-记住这四点即可：
-
-1. **一对多通知**：主题 **Publish** 领域事件；观察者 **Subscribe + Handle**。
-2. **写与扇出分离**：`OrderService` **Save 后 Publish**；邮件/索引 **在 Observer**。
-3. **与 Facade / 命令分层**：Facade **同步编排**；Command **可 Undo 的写**；Observer **事后、常异步** 副作用。
-4. **投递要可靠**：异步 + **Outbox**；Observer **幂等**。
-
-[外观模式](/cs-fundamentals/design-patterns/facade) 解决了 **「客户端如何一次走完下单」**；观察者解决了 **「一个事实发生后，如何让多个依赖方自动跟上，而主题不必认识它们」**——把 **扇出** 从写路径 **剥到可扩展的订阅表**，符合 [开闭](/cs-fundamentals/design-patterns#设计原则) 与 **单一职责**。
+- [责任链模式](/cs-fundamentals/design-patterns/chain-of-responsibility)、[命令模式](/cs-fundamentals/design-patterns/command)、[中介者模式](/cs-fundamentals/design-patterns/mediator) 和观察者模式均用于在不同对象之间传递请求，但各自采用不同的方法。责任链模式按顺序传递请求，直到有一个接收者处理它；命令模式在发送者和请求者之间建立单向连接；中介者模式让发送者和请求者完全消除相互引用，只能通过中介对象间接通信；观察者模式允许接收者动态订阅或取消订阅接收请求。
+- [中介者模式](/cs-fundamentals/design-patterns/mediator) 和观察者模式之间的区别往往很难记住。在大部分情况下，你可以同时使用这两种模式；有时你甚至可以使用其中任意一种。它们之间的主要区别是意图上有所不同。
+  - 中介者的主要目标是消除一组系统组件之间的相互依赖。这些组件转而依赖于单独的中介者对象。该对象会将所有的交互协调起来，从而保持各组件间松耦合。
+  - 观察者的目标是在对象之间建立动态的单向连接，使部分对象可作为其他对象的下属。
+  - 实现中介者模式的一种流行方法是通过依赖观察者模式。中介者对象担当发布者的角色，其余组件则作为订阅者，可以订阅和取消订阅发布者对象上的事件。中介者看上去会非常像观察者，当你只能在一个程序中使用一种模式的话，通常可以使用观察者来替代中介者。但是，你可以在一个程序中同时使用这两种模式：使用观察者来将组件和中介者连接起来。
+  - 还有另外一种实现中介者模式的方法。其中对象所持有的是对中介者对象的永久引用。这样实现方式和观察者并不相同，但这仍然是中介者模式。
+  - 如果将所有组件都变为发布者，且它们之间建立动态连接，使得系统中没有中心化的中介者对象，则最终整个系统会变成一组「分布式观察者」。
 
 ## 参考阅读
 

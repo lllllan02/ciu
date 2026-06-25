@@ -38,9 +38,9 @@ func (e *PricingEngine) Total(ctx context.Context, order Order, user User, chann
 
 ## 解决方案
 
-定义 **PricingStrategy**、**ShippingStrategy**；**PricingEngine** 委托；各 **ConcreteStrategy** 实现一种规则；**Resolver**（或 [工厂方法](/cs-fundamentals/design-patterns/factory)）按上下文 **选择策略**。
+定义 **Strategy** 接口；**Context**（`PricingEngine`）持有策略并 **委托** 计算；各 **ConcreteStrategy** 封装一种规则；**Resolver** 按上下文 **选择** 策略。
 
-### 策略（Strategy）接口
+### 策略与上下文
 
 ```go
 type PricingContext struct {
@@ -51,135 +51,50 @@ type PricingContext struct {
 
 type PricingStrategy interface {
     LineUnitPrice(ctx context.Context, pc PricingContext, line OrderLine) int64
-    OrderDiscount(ctx context.Context, pc PricingContext, subtotal int64) int64
     Name() string
 }
 
-type ShippingStrategy interface {
-    Fee(ctx context.Context, pc PricingContext, subtotal int64) int64
-    Name() string
+type PricingEngine struct {
+    pricing PricingStrategy
+}
+
+func NewPricingEngine(p PricingStrategy) *PricingEngine {
+    return &PricingEngine{pricing: p}
+}
+
+func (e *PricingEngine) Total(ctx context.Context, pc PricingContext) int64 {
+    var sum int64
+    for _, line := range pc.Order.Lines {
+        unit := e.pricing.LineUnitPrice(ctx, pc, line)
+        sum += unit * int64(line.Quantity)
+    }
+    return sum
 }
 ```
 
-拆 **行单价** 与 **整单满减** 可在 **同一 Strategy** 内保持 **规则一致**（避免 live_flash 行价与满减 **分两处 switch**）。
+`CheckoutService`、报表、Mediator **只调** `engine.Total(pc)`，**无 channel switch**。
 
-### 具体策略：标准标价
+### 具体策略
 
 ```go
 type StandardPricingStrategy struct{}
-
-func (StandardPricingStrategy) Name() string { return "standard" }
 
 func (StandardPricingStrategy) LineUnitPrice(_ context.Context, _ PricingContext, line OrderLine) int64 {
     return line.UnitPrice
 }
 
-func (StandardPricingStrategy) OrderDiscount(_ context.Context, _ PricingContext, _ int64) int64 {
-    return 0
-}
-```
-
-### 具体策略：会员价
-
-```go
 type MemberPricingStrategy struct {
     discount float64 // gold: 0.88
 }
 
-func (s MemberPricingStrategy) Name() string { return "member" }
-
 func (s MemberPricingStrategy) LineUnitPrice(_ context.Context, _ PricingContext, line OrderLine) int64 {
     return int64(float64(line.UnitPrice) * s.discount)
 }
-
-func (s MemberPricingStrategy) OrderDiscount(context.Context, PricingContext, int64) int64 {
-    return 0
-}
 ```
 
-### 具体策略：直播间大促
+直播间大促、B2B 合约价、满减、运费等 **各一个 ConcreteStrategy**，套路相同。
 
-```go
-type FlashSalePricingStrategy struct {
-    flashSKUs  map[string]int64
-    orderOff   int64
-}
-
-func (FlashSalePricingStrategy) Name() string { return "flash_sale" }
-
-func (s FlashSalePricingStrategy) LineUnitPrice(_ context.Context, pc PricingContext, line OrderLine) int64 {
-    if p, ok := s.flashSKUs[line.SKU]; ok {
-        return p
-    }
-    return line.UnitPrice
-}
-
-func (s FlashSalePricingStrategy) OrderDiscount(_ context.Context, _ PricingContext, subtotal int64) int64 {
-    if subtotal >= 10000 {
-        return s.orderOff
-    }
-    return 0
-}
-```
-
-### 具体策略：B2B 合约价 + 免运
-
-```go
-type B2BPricingStrategy struct {
-    catalog ContractCatalog
-}
-
-func (B2BPricingStrategy) Name() string { return "b2b" }
-
-func (s B2BPricingStrategy) LineUnitPrice(ctx context.Context, pc PricingContext, line OrderLine) int64 {
-    return s.catalog.Price(ctx, pc.Order.B2BContractID, line.SKU)
-}
-
-func (B2BPricingStrategy) OrderDiscount(context.Context, PricingContext, int64) int64 { return 0 }
-
-type B2BShippingStrategy struct{}
-
-func (B2BShippingStrategy) Fee(context.Context, PricingContext, int64) int64 { return 0 }
-func (B2BShippingStrategy) Name() string                                       { return "b2b_free" }
-```
-
-### 上下文（Context）——PricingEngine
-
-```go
-type PricingEngine struct {
-    pricing  PricingStrategy
-    shipping ShippingStrategy
-}
-
-func NewPricingEngine(pricing PricingStrategy, shipping ShippingStrategy) *PricingEngine {
-    return &PricingEngine{pricing: pricing, shipping: shipping}
-}
-
-func (e *PricingEngine) SetPricingStrategy(s PricingStrategy)  { e.pricing = s }
-func (e *PricingEngine) SetShippingStrategy(s ShippingStrategy) { e.shipping = s }
-
-func (e *PricingEngine) Total(ctx context.Context, pc PricingContext) int64 {
-    var sub int64
-    for _, line := range pc.Order.Lines {
-        unit := e.pricing.LineUnitPrice(ctx, pc, line)
-        sub += unit * int64(line.Quantity)
-    }
-    off := e.pricing.OrderDiscount(ctx, pc, sub)
-    if off > sub {
-        off = sub
-    }
-    return sub - off
-}
-
-func (e *PricingEngine) ShippingFee(ctx context.Context, pc PricingContext) int64 {
-    sub := e.Total(ctx, pc)
-    return e.shipping.Fee(ctx, pc, sub)
-}
-```
-
-**CheckoutService、Report、Mediator** 只调 **`engine.Total(pc)`**——**无 channel switch**。
-
-### 策略解析（Client / 组装层）
+### 选择与组装
 
 ```go
 func ResolvePricingStrategy(user User, channel string, order Order) PricingStrategy {
@@ -187,26 +102,18 @@ func ResolvePricingStrategy(user User, channel string, order Order) PricingStrat
     case order.B2BContractID != "":
         return B2BPricingStrategy{catalog: contractCatalog}
     case channel == "live_flash":
-        return FlashSalePricingStrategy{flashSKUs: flashTable, orderOff: 5000}
-    case user.Tier == "gold" || user.Tier == "silver":
-        return MemberPricingStrategy{discount: tierDiscount(user.Tier)}
+        return FlashSalePricingStrategy{flashSKUs: flashTable}
+    case user.Tier == "gold":
+        return MemberPricingStrategy{discount: 0.88}
     default:
         return StandardPricingStrategy{}
     }
 }
 
-func ResolveShippingStrategy(channel string, order Order) ShippingStrategy {
-    if order.B2BContractID != "" || channel == "b2b" {
-        return B2BShippingStrategy{}
-    }
-    if order.CrossBorder {
-        return WeightBasedShippingStrategy{rates: crossBorderRates}
-    }
-    return ThresholdFreeShippingStrategy{threshold: 9900, baseFee: 800}
-}
+engine := NewPricingEngine(ResolvePricingStrategy(user, channel, order))
 ```
 
-解析逻辑 **集中在 Resolver**；Engine **只算**——符合 [依赖倒置](/cs-fundamentals/design-patterns#设计原则)。
+解析逻辑 **集中在 Resolver**；Engine **只算**。`ShippingStrategy`、函数式策略、注册表见 **实践** 一节。
 
 
 ## 适用场景
@@ -247,8 +154,6 @@ func ResolveShippingStrategy(channel string, order Order) ShippingStrategy {
 
 ## 实践
 
-> **阅读提示**：先掌握「**Resolver 选 Strategy，Engine 委托 Calculate**」即可。本节是工程变体；初学可先跳过。
-
 ### 函数式 Strategy（Go 惯用）
 
 ```go
@@ -265,37 +170,6 @@ gold := LinePricer(func(_ context.Context, _ PricingContext, line OrderLine) int
 ```
 
 **无状态、短规则** 用函数；**要注入 Catalog** 用 struct。
-
-### 与装饰器、组合一起用
-
-```text
-PricingEngine.Total（Strategy：会员行价）
-  → 对每行 line.Total() 若已套 Decorator（CouponLine、GiftWrapLine）
-  → 或 Strategy 只算 base unit，Decorator 在行上调整
-
-Composite 树（BundleLine）
-  → Strategy 可按 SKU 询价；Bundle 的 Total() 内部递归
-```
-
-**约定**：**Strategy 管「基准价从哪来」**；**Decorator 管「行上可选叠加」**——避免 **同一折扣既在 Strategy 又在 CouponLine**。
-
-### 与外观、中介者
-
-```go
-// Facade.PlaceOrder 内
-pc := PricingContext{Order: req.Order, User: req.User, Channel: req.Channel}
-engine := NewPricingEngine(
-    ResolvePricingStrategy(req.User, req.Channel, req.Order),
-    ResolveShippingStrategy(req.Channel, req.Order),
-)
-amount := engine.Total(ctx, pc)
-
-// CheckoutMediator 刷新合计
-m.pricing = engine
-m.state.Total = engine.Total(ctx, m.buildPC())
-```
-
-[外观](/cs-fundamentals/design-patterns/facade) **用 Engine 算应付**；[中介者](/cs-fundamentals/design-patterns/mediator) **引用同一 Engine** 刷新 UI——**规则只在一处**。
 
 ### 策略注册表（运营配置）
 
@@ -315,48 +189,17 @@ func FromConfig(name string) PricingStrategy {
 
 运营改 **活动价** 改 **配置 + 注册**，不必发版 **改 switch**（仍要 **测试 Strategy**）。
 
-### 策略 vs 责任链
+## 关联
 
-| | 策略 | 责任链 |
-| :--- | :--- | :--- |
-| **语义** | **择一算法** 完成计算 | **多处理者** 依次处理请求 |
-| **电商** | 选 B2B 计价 | 下单前风控链 |
-
-「先过风控链，再用 MemberStrategy 计价」——**链在前，策略在后**。
-
-### 测试策略
-
-```go
-func TestMemberPricingStrategy_Gold88(t *testing.T) {
-    s := MemberPricingStrategy{discount: 0.88}
-    pc := PricingContext{}
-    line := OrderLine{UnitPrice: 10000, Quantity: 1}
-    got := s.LineUnitPrice(context.Background(), pc, line)
-    if got != 8800 {
-        t.Fatal(got)
-    }
-}
-
-func TestPricingEngine_UsesInjectedStrategy(t *testing.T) {
-    stub := MemberPricingStrategy{discount: 0.5}
-    e := NewPricingEngine(stub, B2BShippingStrategy{})
-    pc := PricingContext{Order: Order{Lines: []OrderLine{{UnitPrice: 100, Quantity: 2}}}}
-    if e.Total(context.Background(), pc) != 100 {
-        t.Fatal()
-    }
-}
-```
-
-## 小结
-
-记住这四点即可：
-
-1. **算法即对象**：会员价、大促价、B2B 价各是一个 `PricingStrategy`。
-2. **Context 只委托**：`PricingEngine.Total` **不认 channel**，只调 `strategy.LineUnitPrice`。
-3. **Resolver 负责选择**：组装层 `ResolvePricingStrategy(user, channel, order)`——与 [状态](/cs-fundamentals/design-patterns/state) **自动迁移** 区分。
-4. **与装饰器分层**：Strategy **整单/基准算法**；Decorator **行级可叠加**。
-
-[装饰器模式](/cs-fundamentals/design-patterns/decorator) 解决了 **「同一行上多种增强如何套娃」**；策略模式解决了 **「整单计价/运费等算法族如何可替换」**——把 **条件分支** 收到 **可独立测试的策略类**，让渠道与会员规则在 [开闭](/cs-fundamentals/design-patterns#设计原则) 下扩展。
+- [桥接模式](/cs-fundamentals/design-patterns/bridge)、[状态模式](/cs-fundamentals/design-patterns/state)、策略模式（以及在一定程度上 [适配器模式](/cs-fundamentals/design-patterns/adapter)）的接口结构很相似——都基于 [组合模式](/cs-fundamentals/design-patterns/composite) 式的委托，但各自要解决的问题不同。模式不仅是代码组织方式，也是与同伴讨论 **如何解题** 的共同语言。
+- [命令模式](/cs-fundamentals/design-patterns/command) 和策略模式看上去很像，因为两者均能用某些行为来参数化对象。但是，它们的意图完全不同。
+  - 使用命令模式，你可以将任何操作转换为对象，该对象中的操作参数则成为对象的成员变量。你可以延迟执行该操作、将其放入队列、记录操作历史或者向远程服务发送对象等。
+  - 使用策略模式，你通常可以描述实现同一目标的不同方式，使你在同一个上下文类中切换不同的算法。
+- [装饰模式](/cs-fundamentals/design-patterns/decorator) 可让你改变对象的外壳，策略模式则让你能够改变对象的内核。
+- [模板方法模式](/cs-fundamentals/design-patterns/template-method) 基于继承机制：它允许你通过扩展子类中的部分内容来修改算法的某些步骤。同时，策略模式基于组合机制：你可以通过对相应行为提供不同的策略来替换对象的默认行为。模板方法模式将算法分解在类层次上，策略模式将算法分解在对象层次上。
+- [状态模式](/cs-fundamentals/design-patterns/state) 是策略模式的扩展。两者都基于组合机制：它们都通过将部分工作委派给「帮手」对象来在运行时改变行为。还有一个相似之处在于——对客户端而言，它们都是透明的。
+  - 策略模式会让各个策略对象相互完全独立，彼此之间没有任何联系。
+  - 状态模式不会限制具体状态之间的依赖，并允许它们自行改变在不同状态间进行切换。
 
 ## 参考阅读
 

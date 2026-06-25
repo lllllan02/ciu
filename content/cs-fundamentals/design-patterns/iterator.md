@@ -32,9 +32,9 @@ func exportPickList(order Order) []PickItem {
 
 ## 解决方案
 
-定义 **迭代器** 接口；**聚合** 提供工厂方法创建迭代器；各 **具体迭代器** 持有遍历状态（栈、cursor、offset）。
+定义 **迭代器** 接口；**聚合** 提供 `Iterator()`；Client **只调** `HasNext` / `Next`，不碰底层是切片还是 SQL。
 
-### 迭代器（Iterator）接口
+### 迭代器与聚合
 
 ```go
 type Iterator[T any] interface {
@@ -42,208 +42,53 @@ type Iterator[T any] interface {
     Next() (T, error)
 }
 
-// 可选：支持 early stop、资源释放
-type Closer interface {
-    Close() error
-}
-```
-
-若用 Go 1.23+ `iter.Seq[T]`，Aggregate 可返回 **`func(yield func(T) bool)`**，调用方 `for v := range seq`——语义等价，见 [实践](#实践)。
-
-### 聚合（Aggregate）——订单明细
-
-```go
-type OrderLines interface {
-    // 默认：深度优先，含 bundle 节点
-    Iterator() Iterator[OrderLine]
-    // 仅叶子 SKU，供仓储拣货
-    LeafSKUIterator() Iterator[PickItem]
-}
-
-type InMemoryOrder struct {
-    lines []OrderLine
-}
-
-func (o *InMemoryOrder) Iterator() Iterator[OrderLine] {
-    return &DepthFirstLineIterator{
-        stack: append([]OrderLine(nil), o.lines...),
-    }
-}
-
-func (o *InMemoryOrder) LeafSKUIterator() Iterator[PickItem] {
-    return &LeafSKUIterator{
-        stack: append([]OrderLine(nil), o.lines...),
-    }
-}
-```
-
-**不暴露** `lines` 字段给包外；测试包内可用 **构造器** 注入。
-
-### 具体迭代器：深度优先（含组合节点）
-
-```go
-type DepthFirstLineIterator struct {
-    stack []OrderLine
-}
-
-func (it *DepthFirstLineIterator) HasNext() bool {
-    return len(it.stack) > 0
-}
-
-func (it *DepthFirstLineIterator) Next() (OrderLine, error) {
-    if !it.HasNext() {
-        return nil, ErrIteratorDone
-    }
-    n := len(it.stack) - 1
-    line := it.stack[n]
-    it.stack = it.stack[:n]
-    if b, ok := line.(BundleLine); ok {
-        // 子节点逆序压栈 → 深度优先正序弹出
-        for i := len(b.Children) - 1; i >= 0; i-- {
-            it.stack = append(it.stack, b.Children[i])
-        }
-    }
-    return line, nil
-}
-```
-
-用 **显式栈** 代替递归，避免 **深树栈溢出**；顺序与 **先根深度优先** 一致。
-
-### 具体迭代器：仅叶子 SKU（扁平拣货）
-
-```go
-type LeafSKUIterator struct {
-    stack []OrderLine
-}
-
-func (it *LeafSKUIterator) HasNext() bool {
-    for len(it.stack) > 0 {
-        top := it.stack[len(it.stack)-1]
-        if _, ok := top.(ProductLine); ok {
-            return true
-        }
-        it.stack = it.stack[:len(it.stack)-1]
-        if b, ok := top.(BundleLine); ok {
-            for i := len(b.Children) - 1; i >= 0; i-- {
-                it.stack = append(it.stack, b.Children[i])
-            }
-        }
-    }
-    return false
-}
-
-func (it *LeafSKUIterator) Next() (PickItem, error) {
-    if !it.HasNext() {
-        return PickItem{}, ErrIteratorDone
-    }
-    n := len(it.stack) - 1
-    line := it.stack[n].(ProductLine)
-    it.stack = it.stack[:n]
-    return PickItem{SKU: line.SKU, Qty: line.Quantity}, nil
-}
-```
-
-仓储 **`exportPickList`** 改为：
-
-```go
-func exportPickList(order OrderLines) []PickItem {
-    var out []PickItem
-    it := order.LeafSKUIterator()
-    for it.HasNext() {
-        item, _ := it.Next()
-        out = append(out, item)
-    }
-    return out
-}
-```
-
-**不再** 复制 `walk` 递归；新增明细类型时 **只改 Iterator**（或 Composite + Iterator 各管一层）。
-
-### 聚合（Aggregate）——订单仓储与过滤迭代器
-
-```go
 type OrderFilter struct {
     Status string
-    Page   Page
-}
-
-type Page struct {
-    Offset int
     Limit  int
 }
 
 type OrderRepository interface {
     Iterator(ctx context.Context, f OrderFilter) Iterator[Order]
 }
+```
 
-// 内存实现：演示过滤 + 分页
-type InMemoryOrderRepo struct {
+### 具体迭代器
+
+```go
+type orderIterator struct {
     orders []Order
-}
-
-func (r *InMemoryOrderRepo) Iterator(ctx context.Context, f OrderFilter) Iterator[Order] {
-    return &FilteredOrderIterator{
-        ctx: ctx, src: r.orders, filter: f, cursor: f.Page.Offset,
-    }
-}
-
-type FilteredOrderIterator struct {
-    ctx    context.Context
-    src    []Order
     filter OrderFilter
-    cursor int
+    idx    int
     count  int
-    ready  Order
-    hasReady bool
+    next   Order
 }
 
-func (it *FilteredOrderIterator) advance() bool {
-    for it.cursor < len(it.src) && it.count < it.filter.Page.Limit {
-        o := it.src[it.cursor]
-        it.cursor++
+func (it *orderIterator) HasNext() bool {
+    for it.idx < len(it.orders) && it.count < it.filter.Limit {
+        o := it.orders[it.idx]
+        it.idx++
         if it.filter.Status != "" && o.Status != it.filter.Status {
             continue
         }
-        // 跳过 Page.Offset 之前的匹配项
-        if it.filter.Page.Offset > 0 {
-            it.filter.Page.Offset--
-            continue
-        }
-        it.ready, it.hasReady = o, true
+        it.next = o
         it.count++
         return true
     }
-    it.hasReady = false
     return false
 }
 
-func (it *FilteredOrderIterator) HasNext() bool {
-    if it.hasReady {
-        return true
-    }
-    return it.advance()
-}
-
-func (it *FilteredOrderIterator) Next() (Order, error) {
-    if !it.HasNext() {
-        return Order{}, ErrIteratorDone
-    }
-    o := it.ready
-    it.hasReady = false
-    return o, nil
+func (it *orderIterator) Next() (Order, error) {
+    return it.next, nil
 }
 ```
 
-DB 实现可把 **`FilteredOrderIterator`** 换成 **持有 `*sql.Rows` 或 ES scroll id**——**报表 Client 代码不变**。
+内存版在 `Iterator()` 里返回 `&orderIterator{...}`；DB 版内层换成 `*sql.Rows` 或游标，**接口不变**。
 
-### 客户端（Client）——报表与批处理
+### 客户端
 
 ```go
-func reportPaidOrders(ctx context.Context, repo OrderRepository, page, size int) ([]OrderSummary, error) {
-    it := repo.Iterator(ctx, OrderFilter{
-        Status: "paid",
-        Page:   Page{Offset: page * size, Limit: size},
-    })
+func reportPaidOrders(ctx context.Context, repo OrderRepository) ([]OrderSummary, error) {
+    it := repo.Iterator(ctx, OrderFilter{Status: "paid", Limit: 50})
     var sums []OrderSummary
     for it.HasNext() {
         order, err := it.Next()
@@ -254,22 +99,9 @@ func reportPaidOrders(ctx context.Context, repo OrderRepository, page, size int)
     }
     return sums, nil
 }
-
-// 与命令模式：批量关单
-func enqueueCancelPaidExpired(ctx context.Context, repo OrderRepository, q *CommandQueue) error {
-    it := repo.Iterator(ctx, OrderFilter{Status: "paid_expired"})
-    for it.HasNext() {
-        order, err := it.Next()
-        if err != nil {
-            return err
-        }
-        q.Enqueue(NewCancelOrderCommand(ordersSvc, order.ID))
-    }
-    return nil
-}
 ```
 
-Client **只依赖** `Iterator[Order]`，不依赖 `[]Order`。
+订单明细树（扁平化 bundle 内 SKU）可复用 [组合模式](/cs-fundamentals/design-patterns/composite) 的 `Walk`；多种遍历策略见 **实践** 一节。
 
 
 ## 适用场景
@@ -296,7 +128,7 @@ Client **只依赖** `Iterator[Order]`，不依赖 `[]Order`。
 | :--- | :--- |
 | **解耦客户端与聚合** | 报表不依赖 `[]Order` 或 SQL |
 | **开闭** | 新遍历 = 新 ConcreteIterator |
-| **多种策略并存** | 同一 `OrderLines` 上 `LeafSKUIterator` vs `DepthFirstLineIterator` |
+| **多种策略并存** | 同一 Repository 可换过滤条件；明细树用 `Walk` 或独立 Iterator |
 | **支持懒加载与分页** | Iterator 按需 `Next`，控制内存 |
 | **单一职责** | 遍历算法 **不在** 业务 Service 里复制 |
 
@@ -308,162 +140,12 @@ Client **只依赖** `Iterator[Order]`，不依赖 `[]Order`。
 | **错误处理** | `Next() (T, error)` 需区分 **Done vs 失败** |
 | **组合过滤 Iterator 链** | 多层装饰式 Iterator 调试时要 **命名清晰** |
 
-## 实践
+## 关联
 
-> **阅读提示**：先掌握「**Aggregate 提供 Iterator，Client 只 Next**」即可。本节是工程变体；初学可先跳过。
-
-### Go 1.23+ `iter.Seq` 薄封装
-
-```go
-func (o *InMemoryOrder) AllLeafSKUs() iter.Seq[PickItem] {
-    return func(yield func(PickItem) bool) {
-        it := o.LeafSKUIterator()
-        for it.HasNext() {
-            item, err := it.Next()
-            if err != nil {
-                return
-            }
-            if !yield(item) {
-                return
-            }
-        }
-    }
-}
-
-// Client
-for item := range order.AllLeafSKUs() {
-    pickList = append(pickList, item)
-}
-```
-
-**early stop**：`yield` 返回 `false` 即停——比经典 Iterator 的 **Break** 更 Go 惯用。
-
-### 装饰式过滤 Iterator
-
-```go
-type FilterIterator[T any] struct {
-    inner Iterator[T]
-    pred  func(T) bool
-    next  T
-    ok    bool
-}
-
-func (f *FilterIterator[T]) HasNext() bool {
-    for f.inner.HasNext() {
-        v, err := f.inner.Next()
-        if err != nil {
-            return false
-        }
-        if f.pred(v) {
-            f.next, f.ok = v, true
-            return true
-        }
-    }
-    return false
-}
-
-func (f *FilterIterator[T]) Next() (T, error) {
-    if !f.ok && !f.HasNext() {
-        var zero T
-        return zero, ErrIteratorDone
-    }
-    f.ok = false
-    return f.next, nil
-}
-
-// 在「已支付」Iterator 外再包「金额 > 1000」
-it := &FilterIterator[Order]{
-    inner: repo.Iterator(ctx, OrderFilter{Status: "paid"}),
-    pred:  func(o Order) bool { return o.Total > 1000 },
-}
-```
-
-**开闭**：新条件 **新 pred 或新 FilterIterator**，不改 `FilteredOrderIterator` 源码。
-
-### 与组合、命令、外观一起用
-
-```text
-OrderLines（Composite 树）
-  → LeafSKUIterator → WMS 导出
-  → DepthFirstLineIterator → 审计日志
-
-OrderRepository.Iterator
-  → ReportService 分页
-  → CommandQueue Worker 批量 CancelOrderCommand
-
-CheckoutFacade.PlaceOrder
-  → 内部可能对 Lines 做 Validate（Composite）
-  → 落库后 SearchIndexer 用 OrderLineIterator 扇出 SKU
-```
-
-[组合](/cs-fundamentals/design-patterns/composite) 管 **节点行为**；迭代器管 **访问顺序与暴露边界**；[命令](/cs-fundamentals/design-patterns/command) 管 **对 Iterator 取出的每个 Order 做什么**。
-
-### 并发与快照
-
-| 场景 | 做法 |
-| :--- | :--- |
-| 遍历中可能改购物车 | Iterator 构造时 **拷贝 slice 头** 或 **版本号** 检测 |
-| DB 分页 | **稳定排序键** + `WHERE id > ? LIMIT`；勿无 ORDER BY 深分页 |
-| 长事务导出 | **只读副本** 或 **快照隔离**；Iterator `Close` 释放连接 |
-
-```go
-type SnapshotLineIterator struct {
-    lines []OrderLine // 构造时 deep copy 或 immutable 共享
-    idx   int
-}
-```
-
-### 测试策略
-
-```go
-func TestLeafSKUIterator_FlattensBundle(t *testing.T) {
-    order := &InMemoryOrder{lines: []OrderLine{
-        BundleLine{Children: []OrderLine{
-            ProductLine{SKU: "a", Quantity: 1},
-            ProductLine{SKU: "b", Quantity: 2},
-        }},
-    }}
-    var skus []string
-    it := order.LeafSKUIterator()
-    for it.HasNext() {
-        item, _ := it.Next()
-        skus = append(skus, item.SKU)
-    }
-    if len(skus) != 2 || skus[0] != "a" {
-        t.Fatal(skus)
-    }
-}
-
-func TestFilteredOrderIterator_Pagination(t *testing.T) {
-    repo := &InMemoryOrderRepo{orders: []Order{
-        {ID: "1", Status: "paid"},
-        {ID: "2", Status: "pending"},
-        {ID: "3", Status: "paid"},
-    }}
-    it := repo.Iterator(context.Background(), OrderFilter{
-        Status: "paid", Page: Page{Offset: 0, Limit: 10},
-    })
-    var ids []string
-    for it.HasNext() {
-        o, _ := it.Next()
-        ids = append(ids, o.ID)
-    }
-    if len(ids) != 2 {
-        t.Fatal(ids)
-    }
-}
-```
-
-## 小结
-
-记住这四点即可：
-
-1. **遍历即对象**：`LeafSKUIterator`、`FilteredOrderIterator` 封装 **怎么取下一个**，Client 不碰内部 `[]OrderLine` / SQL。
-2. **Aggregate 只造 Iterator**：`OrderLines.LeafSKUIterator()`、`OrderRepository.Iterator(filter)`——换存储 **改 ConcreteAggregate + ConcreteIterator**。
-3. **与 Composite 分层**：Composite 的 `Total()` **递归聚合**；Iterator **按需逐个元素** 给导出、报表、批处理。
-4. **Go 工程**：简单场景 `range`；多策略 / 分页 / 隐藏存储 用 **显式 Iterator 或 `iter.Seq`**；与 [命令](/cs-fundamentals/design-patterns/command) 组合做 **「遍历 + 入队」** 管道。
-
-[组合模式](/cs-fundamentals/design-patterns/composite) 解决了 **「树形明细上操作一致」**；迭代器解决 **「访问这棵树或订单列表时，调用方不必知道怎么存、怎么扫」**——把 **遍历算法** 从业务 Service 和聚合内部 **抽到可替换的 Iterator**，让仓储迁移与多种导出视图在 [开闭](/cs-fundamentals/design-patterns#设计原则) 下演进。
+- 你可以使用迭代器来遍历 [组合模式](/cs-fundamentals/design-patterns/composite) 的树。
+- 你可以同时使用 [工厂方法模式](/cs-fundamentals/design-patterns/factory) 和迭代器来让集合子类返回不同类型的迭代器，并使迭代器与集合相匹配。
+- 你可以同时使用 [备忘录模式](/cs-fundamentals/design-patterns/memento) 和迭代器来获取当前迭代器的状态，并在需要时进行回滚。
+- 你可以同时使用 [访问者模式](/cs-fundamentals/design-patterns/visitor) 和迭代器来遍历复杂的数据结构，并对其元素进行特定操作，即使这些元素属于完全不同的类。
 
 ## 参考阅读
 

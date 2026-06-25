@@ -30,9 +30,48 @@ func (p *LineItemsPanel) OnQtyChanged(sku string, qty int) {
 
 ## 解决方案
 
-定义 **中介者** 接口；**具体中介** 持有 **共享上下文** 与同事引用；各 **同事** 只依赖 `Mediator`。
+核心思路：**把「谁改了什么 → 还要刷新谁」从各个面板里抽出来，集中到一个中介里**。
 
-### 共享上下文（CheckoutContext）
+### 和原来有什么不同
+
+用户改地址时，两种写法对比：
+
+**原来：面板互调（网状）**
+
+```text
+AddressForm ──直接调用──▶ ShippingPanel.Recalc()
+              ──直接调用──▶ SummaryPanel.Recalc()
+              ──直接调用──▶ PaymentPanel.FilterByRegion()
+```
+
+每个面板 struct 里都要 **持有** 其他面板的引用；改地址要知道运费、合计、支付 **三个下游**，加「发票抬头」还要再改地址表单。
+
+**现在：只找中介（星型）**
+
+```text
+AddressForm ──Notify("address_changed")──▶ CheckoutMediator
+                                              │
+                         ┌────────────────────┼────────────────────┐
+                         ▼                    ▼                    ▼
+                  ShippingPanel        SummaryPanel         PaymentPanel
+                  Refresh(state)         Refresh(state)       Refresh(state)
+```
+
+地址表单 **只说一句「地址变了」**；中介更新共享 `CheckoutContext`，再决定 **refresh 哪几个面板、按什么顺序**。
+
+| | 原来（互调） | 中介者 |
+| :--- | :--- | :--- |
+| **依赖形状** | N 个面板 → 网状互引 | N 个面板 → 各连 1 条到 Mediator |
+| **联动规则在哪** | 散在 `OnQtyChanged`、`OnUserSelect` 各处 | 集中在 `Mediator.Notify` |
+| **加新面板** | 可能要改 **多个** 旧面板 | `Register` + 改 **一处** `case` |
+| **单测地址表单** | mock 合计、运费、支付 | mock **一个** Mediator，断言 Notify 了什么 |
+| **面板复用** | 绑死在当前页的依赖图上 | 换页只 **换注册列表** |
+
+优势一句话：**同事只上报事件，中介统一编排响应**——依赖从「人人认识人人」变成「人人只认识中介」。
+
+### 中介者与同事
+
+定义 **中介者** 接口；**具体中介** 维护共享状态与联动规则；各 **同事** 只依赖 `Mediator`，变更时 `Notify`，由中介决定 `Refresh` 谁。
 
 ```go
 type CheckoutContext struct {
@@ -41,233 +80,87 @@ type CheckoutContext struct {
     Coupon   string
     Shipping ShippingQuote
     Total    int64
-    Region   string
 }
-
-type EventType string
-
-const (
-    LinesChanged    EventType = "lines_changed"
-    AddressChanged  EventType = "address_changed"
-    CouponApplied   EventType = "coupon_applied"
-    ShippingChanged EventType = "shipping_changed"
-)
 
 type Event struct {
-    Type    EventType
+    Type    string
     Payload any
 }
-```
-
-上下文 **由中介维护**；同事 **读快照** 或通过中介 **查询**，避免 **直接改** 他人状态。
-
-### 中介者（Mediator）接口与同事标识
-
-```go
-type ColleagueID string
-
-const (
-    ColleagueLines    ColleagueID = "lines"
-    ColleagueAddress  ColleagueID = "address"
-    ColleagueCoupon   ColleagueID = "coupon"
-    ColleagueShipping ColleagueID = "shipping"
-    ColleaguePayment  ColleagueID = "payment"
-    ColleagueSummary  ColleagueID = "summary"
-)
 
 type Colleague interface {
-    ID() ColleagueID
     Refresh(ctx context.Context, state *CheckoutContext) error
 }
 
 type Mediator interface {
     Register(c Colleague)
-    Notify(from ColleagueID, ev Event) error
+    Notify(from string, ev Event) error
     State() *CheckoutContext
 }
 ```
 
-`Notify` **由触发变更的同事调用**；`Refresh` **由中介回调** 需要更新的同事。
+同事 **不互持引用**；只向中介 `Notify`，由中介更新 `CheckoutContext` 并回调需要刷新的面板。
 
-### 具体中介：CheckoutMediator
+### 具体中介
 
 ```go
 type CheckoutMediator struct {
     state      CheckoutContext
-    colleagues map[ColleagueID]Colleague
+    colleagues map[string]Colleague
     pricing    PricingEngine
     shipping   ShippingService
 }
 
-func (m *CheckoutMediator) Register(c Colleague) {
-    if m.colleagues == nil {
-        m.colleagues = make(map[ColleagueID]Colleague)
-    }
-    m.colleagues[c.ID()] = c
-}
-
-func (m *CheckoutMediator) State() *CheckoutContext {
-    return &m.state
-}
-
-func (m *CheckoutMediator) Notify(from ColleagueID, ev Event) error {
-    ctx := context.Background()
+func (m *CheckoutMediator) Notify(from string, ev Event) error {
     switch ev.Type {
-    case LinesChanged:
-        lines := ev.Payload.([]OrderLine)
-        m.state.Lines = lines
-        return m.recalcAll(ctx)
-
-    case AddressChanged:
-        addr := ev.Payload.(Address)
-        m.state.Address = addr
-        m.state.Region = addr.Country
-        quote, err := m.shipping.Quote(ctx, addr, m.state.Lines)
-        if err != nil {
-            return err
-        }
+    case "address_changed":
+        m.state.Address = ev.Payload.(Address)
+        quote, _ := m.shipping.Quote(context.Background(), m.state.Address, m.state.Lines)
         m.state.Shipping = quote
-        if err := m.refresh(ColleagueShipping, ColleaguePayment, ColleagueSummary); err != nil {
-            return err
-        }
-        return m.recalcTotal(ctx)
-
-    case CouponApplied:
-        m.state.Coupon = ev.Payload.(string)
-        if err := m.recalcTotal(ctx); err != nil {
-            return err
-        }
-        if m.pricing.FreeShipping(m.state.Coupon, m.state.Total) {
-            m.state.Shipping.Fee = 0
-            _ = m.colleagues[ColleagueShipping].Refresh(ctx, &m.state)
-        }
-        return m.refresh(ColleagueSummary, ColleaguePayment)
-
-    default:
-        return nil
+        m.state.Total = m.pricing.Total(m.state.Lines, m.state.Coupon)
+        return m.refresh("shipping", "summary", "payment")
+    case "lines_changed":
+        m.state.Lines = ev.Payload.([]OrderLine)
+        m.state.Total = m.pricing.Total(m.state.Lines, m.state.Coupon)
+        return m.refresh("summary", "coupon", "payment")
     }
-}
-
-func (m *CheckoutMediator) recalcAll(ctx context.Context) error {
-    quote, err := m.shipping.Quote(ctx, m.state.Address, m.state.Lines)
-    if err != nil {
-        return err
-    }
-    m.state.Shipping = quote
-    if err := m.recalcTotal(ctx); err != nil {
-        return err
-    }
-    return m.refresh(ColleagueShipping, ColleagueSummary, ColleaguePayment, ColleagueCoupon)
-}
-
-func (m *CheckoutMediator) recalcTotal(ctx context.Context) error {
-    m.state.Total = m.pricing.Total(ctx, m.state.Lines, m.state.Coupon, m.state.Shipping)
     return nil
 }
 
-func (m *CheckoutMediator) refresh(ctx context.Context, ids ...ColleagueID) error {
+func (m *CheckoutMediator) refresh(ids ...string) error {
     for _, id := range ids {
-        if c, ok := m.colleagues[id]; ok {
-            if err := c.Refresh(ctx, &m.state); err != nil {
-                return err
-            }
-        }
+        _ = m.colleagues[id].Refresh(context.Background(), &m.state)
     }
     return nil
 }
 ```
 
-**联动顺序**（先运费再合计再支付）**只写在一处**；新增「发票抬头」= **新 Colleague + 在对应 `case` 里 `refresh`**。
+「用券免运」「改地址禁 COD」等规则 **只写在这里**；新增面板 = `Register` + 在对应 `case` 里补 `refresh`。
 
-### 具体同事：地址表单（只认中介）
+### 同事与组装
 
 ```go
 type AddressForm struct {
     mediator Mediator
-    addr     Address
 }
 
-func (f *AddressForm) SetMediator(m Mediator) { f.mediator = m }
-
-func (f *AddressForm) ID() ColleagueID { return ColleagueAddress }
-
 func (f *AddressForm) OnUserSelect(addr Address) error {
-    f.addr = addr
-    return f.mediator.Notify(ColleagueAddress, Event{Type: AddressChanged, Payload: addr})
+    return f.mediator.Notify("address", Event{Type: "address_changed", Payload: addr})
 }
 
 func (f *AddressForm) Refresh(ctx context.Context, state *CheckoutContext) error {
-    // 只更新自身展示，例如从 state 同步校验提示
-    return nil
+    return nil // 更新自身展示
+}
+
+m := &CheckoutMediator{pricing: pricing, shipping: shipping}
+addr := &AddressForm{mediator: m}
+m.colleagues = map[string]Colleague{
+    "address": addr,
+    "summary": &SummaryPanel{},
+    "payment": &PaymentPanel{},
 }
 ```
 
-### 具体同事：合计面板
-
-```go
-type SummaryPanel struct {
-    mediator Mediator
-    display  int64
-}
-
-func (p *SummaryPanel) ID() ColleagueID { return ColleagueSummary }
-
-func (p *SummaryPanel) Refresh(ctx context.Context, state *CheckoutContext) error {
-    p.display = state.Total + state.Shipping.Fee
-    return nil
-}
-```
-
-### 具体同事：支付面板（示例）
-
-```go
-type PaymentPanel struct {
-    mediator       Mediator
-    regionFiltered bool
-}
-
-func (p *PaymentPanel) SetMediator(m Mediator) { p.mediator = m }
-
-func (p *PaymentPanel) ID() ColleagueID { return ColleaguePayment }
-
-func (p *PaymentPanel) Refresh(ctx context.Context, state *CheckoutContext) error {
-    p.regionFiltered = state.Region != "" // 按地区过滤 COD 等
-    return nil
-}
-```
-
-### 组装与客户端
-
-```go
-func NewCheckoutPage(pricing PricingEngine, ship ShippingService) *CheckoutMediator {
-    m := &CheckoutMediator{pricing: pricing, shipping: ship}
-    lines := &LineItemsPanel{}
-    addr := &AddressForm{}
-    coupon := &CouponWidget{}
-    shipping := &ShippingPanel{}
-    payment := &PaymentPanel{}
-    summary := &SummaryPanel{}
-
-    for _, c := range []Colleague{lines, addr, coupon, shipping, payment, summary} {
-        m.Register(c)
-        if setter, ok := c.(interface{ SetMediator(Mediator) }); ok {
-            setter.SetMediator(m)
-        }
-    }
-    return m
-}
-
-// 用户点「提交」——仍走外观，不走 Mediator 替代 PlaceOrder
-func (h *CheckoutHandler) Submit(w http.ResponseWriter, r *http.Request) {
-    state := h.page.State()
-    req := PlaceOrderRequest{Lines: state.Lines, Address: state.Address, /* … */}
-    if err := h.facade.PlaceOrder(r.Context(), req); err != nil {
-        http.Error(w, err.Error(), 500)
-    }
-}
-```
-
-**页内协同** 用 Mediator；**落库提交** 用 [外观](/cs-fundamentals/design-patterns/facade)——职责清晰。
+**页内协同** 走 Mediator；**提交落库** 仍走 [外观](/cs-fundamentals/design-patterns/facade) 的 `PlaceOrder`——职责分开。多事件分支、`CheckoutRules` 拆分见 **实践** 一节。
 
 
 ## 适用场景
@@ -307,8 +200,6 @@ func (h *CheckoutHandler) Submit(w http.ResponseWriter, r *http.Request) {
 
 ## 实践
 
-> **阅读提示**：先掌握「**同事 Notify，中介 Refresh**」即可。本节是工程变体；初学可先跳过。
-
 ### 中介者 vs 全局 EventBus
 
 ```go
@@ -316,7 +207,7 @@ func (h *CheckoutHandler) Submit(w http.ResponseWriter, r *http.Request) {
 bus.Publish(OrderPaid{ID: orderID})
 
 // 结算页内：必须先 recalcTotal 再 refresh Payment
-mediator.Notify(ColleagueCoupon, Event{Type: CouponApplied, Payload: code})
+mediator.Notify(ColleagueCoupon, Event{Type: "coupon_applied", Payload: code})
 ```
 
 **页内** 用 Mediator 保证 **顺序与一致性**；**跨 bounded context** 用 Bus。**勿** 用全局 Bus 替代页内 Mediator 却 **无编排**，易出现 **Payment 读到旧 Total**。
@@ -338,11 +229,6 @@ User clicks Submit
 ```
 
 [装饰器](/cs-fundamentals/design-patterns/decorator) 在 **`PricingEngine.Total` 内部** 叠行级价；Mediator **不替代** 计价领域逻辑。
-
-### 与命令、责任链一起用
-
-- **页内**：Mediator 协调展示；用户点「改数量」可 **`invoker.Run(AdjustQuantityCommand)`**（[命令](/cs-fundamentals/design-patterns/command)）成功后 **`mediator.Notify(LinesChanged)`**。
-- **提交前**：`PlaceOrder` 前 **`preCheckChain.Handle`**（[责任链](/cs-fundamentals/design-patterns/chain-of-responsibility)）在 Facade 内；Mediator **不参与** 服务端校验链。
 
 ### 防止中介膨胀
 
@@ -367,56 +253,23 @@ func (r *CheckoutRules) OnAddressChanged(state *CheckoutContext, addr Address) e
 
 `CheckoutMediator.Notify` **委托** `rules.OnXxx`；复杂规则 **可单测 Rules** 而不 mock 六个 Panel。
 
-### 测试策略
+## 关联
 
-```go
-func TestCheckoutMediator_AddressChangeRefreshesPayment(t *testing.T) {
-    payment := &PaymentPanel{}
-    m := NewCheckoutPage(fakePricing{}, fakeShipping{})
-    m.Register(payment) // 覆盖默认注册，便于断言
-    addr := &AddressForm{mediator: m}
-    m.Register(addr)
-
-    if err := addr.OnUserSelect(Address{Country: "US"}); err != nil {
-        t.Fatal(err)
-    }
-    if !payment.regionFiltered {
-        t.Fatal("payment should refresh on address change")
-    }
-}
-
-func TestAddressForm_DoesNotReferenceSummary(t *testing.T) {
-    med := &recordingMediator{lastFrom: ColleagueAddress}
-    f := &AddressForm{mediator: med}
-    _ = f.OnUserSelect(Address{City: "Shanghai"})
-    if med.lastEvent.Type != AddressChanged {
-        t.Fatal("should notify mediator only")
-    }
-}
-
-type recordingMediator struct {
-    lastFrom  ColleagueID
-    lastEvent Event
-}
-
-func (r *recordingMediator) Register(Colleague) {}
-func (r *recordingMediator) State() *CheckoutContext { return &CheckoutContext{} }
-func (r *recordingMediator) Notify(from ColleagueID, ev Event) error {
-    r.lastFrom, r.lastEvent = from, ev
-    return nil
-}
-```
-
-## 小结
-
-记住这四点即可：
-
-1. **星型而非网状**：同事 **只 Notify Mediator**，不互持引用。
-2. **联动规则集中**：改地址 → 运费 → 合计 → 支付过滤 **写在中介**（或 `CheckoutRules`）。
-3. **与 Facade 分层**：Mediator 管 **页内/会话内协同**；Facade 管 **提交用例 PlaceOrder**。
-4. **开闭靠 Register**：新面板 **实现 Colleague + Register**；改 **Notify 分支** 而非改所有同事。
-
-[外观模式](/cs-fundamentals/design-patterns/facade) 解决了 **「外部客户端如何一次用完子系统」**；中介者解决 **「内部多个对等组件如何联动而不织成网」**——把 **对象间的交互** 从分散的 **双向依赖** 收到 **可测试、可演进的中介**，符合 [迪米特法则](/cs-fundamentals/design-patterns#设计原则) 与 **单一职责**。
+- [责任链模式](/cs-fundamentals/design-patterns/chain-of-responsibility)、[命令模式](/cs-fundamentals/design-patterns/command)、[中介者模式](/cs-fundamentals/design-patterns/mediator) 和 [观察者模式](/cs-fundamentals/design-patterns/observer) 均用于在不同对象之间传递请求，但各自采用不同的方法。责任链模式按顺序传递请求，直到有一个接收者处理它；命令模式在发送者和请求者之间建立单向连接；中介者模式让发送者和请求者完全消除相互引用，只能通过中介对象间接通信；观察者模式允许接收者动态订阅或取消订阅接收请求。
+- [外观模式](/cs-fundamentals/design-patterns/facade) 和 [中介者模式](/cs-fundamentals/design-patterns/mediator) 的职责类似：它们都尝试在大量紧密耦合的类中组织起合作。
+    - 外观为子系统中的所有对象定义了一个简单接口，但是它不提供任何新功能。子系统本身不会意识到外观的存在。子系统中的对象可以直接进行交流。
+    - 中介者将系统中组件的沟通行为中心化。各组件只知道中介者对象，无法直接相互交流。
+    - **为谁简化**：外观简化 **外部调用方**（Handler、Worker）；中介者简化 **内部对等组件**（结算页各面板）。
+    - **关系方向**：外观是 **单向**——Client → Facade → 子系统；中介者是 **星型**——同事 ↔ Mediator，同事之间 **不直连**。
+    - **子系统是否互知**：外观 **不禁止** 库存调支付；中介者 **禁止** 地址面板直接调合计面板。
+    - **典型动作**：外观 **编排用例**（`PlaceOrder`：预占→支付→落库）；中介者 **协调联动**（改地址→刷新运费→合计→支付）。
+    - **电商落点**：`CheckoutFacade` 管 **提交**；`CheckoutMediator` 管 **页内刷新**——常 **同页并存**，各管一层。
+- [中介者模式](/cs-fundamentals/design-patterns/mediator) 和 [观察者模式](/cs-fundamentals/design-patterns/observer) 之间的区别往往很难记住。在大部分情况下，你可以同时使用这两种模式；有时你甚至可以使用其中任意一种。它们之间的主要区别是意图上有所不同。
+  - 中介者的主要目标是消除一组系统组件之间的相互依赖。这些组件转而依赖于单独的中介者对象。该对象会将所有的交互协调起来，从而保持各组件间松耦合。
+  - 观察者的目标是在对象之间建立动态的单向连接，使部分对象可作为其他对象的下属。
+  - 实现中介者模式的一种流行方法是通过依赖 [观察者模式](/cs-fundamentals/design-patterns/observer)。中介者对象担当发布者的角色，其余组件则作为订阅者，可以订阅和取消订阅发布者对象上的事件。中介者看上去会非常像观察者，当你只能在一个程序中使用一种模式的话，通常可以使用观察者来替代中介者。但是，你可以在一个程序中同时使用这两种模式：使用观察者来将组件和中介者连接起来。
+  - 还有另外一种实现中介者模式的方法。其中对象所持有的是对中介者对象的永久引用。这样实现方式和观察者并不相同，但这仍然是中介者模式。
+  - 如果将所有组件都变为发布者，且它们之间建立动态连接，使得系统中没有中心化的中介者对象，则最终整个系统会变成一组「分布式观察者」。
 
 ## 参考阅读
 

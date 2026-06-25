@@ -31,167 +31,56 @@ func (h *AdminHandler) ShowOrder(w http.ResponseWriter, r *http.Request) {
 
 ## 解决方案
 
-定义与 **主题** 相同的接口 `OrderRepository`；**真实主题** `SQLOrderRepository` 负责 SQL；**代理** 实现同一接口，持有 `real`，在委托前后插入控制。客户端 **只注入接口**。
+定义与 **主题** 相同的接口；**真实主题** 负责 SQL / RPC；**代理** 实现同一接口，持有 `real`，在委托前后插入控制。客户端 **只注入接口**。
 
-### 主题（Subject）与真实主题（Real Subject）
+### 主题与保护代理
 
 ```go
-type Order struct {
-    ID     string
-    UserID string
-    Status string
-    Amount int64
-    lines  []OrderLine // 小写：由仓库填充，列表页可不加载
-}
-
-func (o *Order) Lines() []OrderLine { return o.lines }
-
 type OrderRepository interface {
-    GetOrder(ctx context.Context, orderID string) (*Order, error)
-    LoadLines(ctx context.Context, orderID string) ([]OrderLine, error)
+    GetOrder(ctx context.Context, id string) (*Order, error)
     Save(ctx context.Context, order *Order) error
 }
 
-type SQLOrderRepository struct {
-    db *sql.DB
-}
-
-func (r *SQLOrderRepository) GetOrder(ctx context.Context, orderID string) (*Order, error) {
-    // SELECT id, user_id, status, amount FROM orders WHERE id = ?
-    // 不 JOIN lines
-}
-
-func (r *SQLOrderRepository) LoadLines(ctx context.Context, orderID string) ([]OrderLine, error) {
-    // SELECT … FROM order_lines WHERE order_id = ?
-}
-```
-
-### 虚拟代理（Virtual Proxy）——延迟加载明细
-
-```go
-type LazyOrderProxy struct {
-    real OrderRepository
-}
-
-func (p *LazyOrderProxy) GetOrder(ctx context.Context, orderID string) (*Order, error) {
-    order, err := p.real.GetOrder(ctx, orderID)
-    if err != nil {
-        return nil, err
-    }
-    return &lazyOrder{
-        header: order,
-        real:   p.real,
-        ctx:    ctx,
-    }, nil
-}
-
-type lazyOrder struct {
-    header *Order
-    real   OrderRepository
-    ctx    context.Context
-    lines  []OrderLine
-    loaded bool
-}
-
-func (o *lazyOrder) Lines() []OrderLine {
-    if !o.loaded {
-        o.lines, _ = o.real.LoadLines(o.ctx, o.header.ID)
-        o.loaded = true
-    }
-    return o.lines
-}
-```
-
-列表页只读 `Amount`、`Status` ** never 触发** `LoadLines`；详情页第一次 `Lines()` 才查 DB。可与 [享元](/cs-fundamentals/design-patterns/flyweight) 衔接：`LoadLines` 返回 `(sku, ctx)`，由工厂 `Get(sku)` 绑定元数据。
-
-### 保护代理（Protection Proxy）——访问控制
-
-```go
-type AuthChecker interface {
-    CanReadOrder(ctx context.Context, orderID string) bool
-    CanWriteOrder(ctx context.Context, orderID string) bool
-}
+type SQLOrderRepository struct{ db *sql.DB } // 只管持久化
 
 type ProtectionProxy struct {
     real OrderRepository
     auth AuthChecker
 }
 
-func (p *ProtectionProxy) GetOrder(ctx context.Context, orderID string) (*Order, error) {
-    if !p.auth.CanReadOrder(ctx, orderID) {
+func (p *ProtectionProxy) GetOrder(ctx context.Context, id string) (*Order, error) {
+    if !p.auth.CanRead(ctx, id) {
         return nil, ErrForbidden
     }
-    return p.real.GetOrder(ctx, orderID)
-}
-
-func (p *ProtectionProxy) Save(ctx context.Context, order *Order) error {
-    if !p.auth.CanWriteOrder(ctx, order.ID) {
-        return ErrForbidden
-    }
-    return p.real.Save(ctx, order)
+    return p.real.GetOrder(ctx, id)
 }
 ```
 
-鉴权 **集中在代理**；`SQLOrderRepository` **不 import** `http` 或 JWT——符合 [单一职责](/cs-fundamentals/design-patterns#设计原则)。[外观](/cs-fundamentals/design-patterns/facade) 的 `PlaceOrder` 仍调 **已注入权限上下文** 的 repo；后台代客下单可走 **另一套** `AuthChecker` 实现，代理层不变。
+`Save` 同理：鉴权通过再 `p.real.Save`。鉴权集中在代理里，`SQLOrderRepository` **不必** import JWT 或 HTTP。
 
-### 远程代理（Remote Proxy）——封装跨区库存
+### 其他代理形态（同一套路）
 
-```go
-type InventoryService interface {
-    CheckStock(ctx context.Context, sku string, qty int) error
-    Reserve(ctx context.Context, lines []OrderLine) error
-}
+| 类型 | 控制什么 | 要点 |
+| :--- | :--- | :--- |
+| **虚拟** | 延迟加载 | `GetOrder` 只查 header；第一次访问明细再 `LoadLines` |
+| **远程** | 网络访问 | 在 `CheckStock` 外包 timeout / 重试，对内仍是 `InventoryService` |
+| **缓存** | 读多写少 | 只读 `CheckStock` 可短 TTL；`Reserve` / `Save` **直通** inner |
 
-type RemoteInventoryProxy struct {
-    client pb.InventoryClient
-    timeout time.Duration
-}
+三种都是 **同接口 + 持有 inner + 委托前后加逻辑**，与保护代理结构相同；差别只在 **控制动机**（懒加载 / 远程 / 缓存 vs 鉴权）。
 
-func (p *RemoteInventoryProxy) CheckStock(ctx context.Context, sku string, qty int) error {
-    ctx, cancel := context.WithTimeout(ctx, p.timeout)
-    defer cancel()
-    _, err := p.client.CheckStock(ctx, &pb.CheckStockRequest{Sku: sku, Qty: int32(qty)})
-    return err
-}
-```
+### 客户端
 
-Checkout、[外观](/cs-fundamentals/design-patterns/facade) 内 `inventory` 字段类型仍是 `InventoryService`——**本地实现** 与 **gRPC 代理** 可替换；与 [适配器](/cs-fundamentals/design-patterns/adapter) 组合：Adapter 把 SDK 类型 **译成** `InventoryService`，Remote Proxy 管 **网络与控制**。
-
-### 缓存代理（Caching Proxy）——短 TTL 库存预检
+组装层可 **链式** 包装；Handler 只认 `OrderRepository`：
 
 ```go
-type CachingInventoryProxy struct {
-    inner InventoryService
-    cache *ttlcache.Cache[string, error] // key: sku+qty
-    ttl   time.Duration
-}
-
-func (p *CachingInventoryProxy) CheckStock(ctx context.Context, sku string, qty int) error {
-    key := sku + ":" + strconv.Itoa(qty)
-    if v, ok := p.cache.Get(key); ok {
-        return v
-    }
-    err := p.inner.CheckStock(ctx, sku, qty)
-    p.cache.Set(key, err, p.ttl)
-    return err
-}
-```
-
-`Reserve` **必须** 直通 `inner`（写操作不缓存）；`CheckStock` 只读可缓存——**智能引用** 可在 `Reserve` 成功后 **Invalidate** 相关 sku 键。
-
-### 客户端（Client）——组装链
-
-```go
-realRepo := &SQLOrderRepository{db: db}
 repo := &ProtectionProxy{
-    real: &LazyOrderProxy{real: realRepo},
+    real: &SQLOrderRepository{db: db},
     auth: authChecker,
 }
-
 adminHandler := &AdminHandler{repo: repo}
 ```
 
-客户端 **只依赖** `OrderRepository`；测试时 `repo` 换为 **内存 fake**，无需 DB、gRPC、Redis。
+测试时把 `repo` 换成 fake，无需 DB、gRPC。虚拟 / 缓存等细节见 **实践** 一节。
 
 
 ## 适用场景
@@ -232,8 +121,6 @@ adminHandler := &AdminHandler{repo: repo}
 
 ## 实践
 
-> **阅读提示**：先掌握「**同接口替身 + 控制访问 + 委托 real**」即可。本节是工程变体；初学可先跳过。
-
 ### 代理链顺序建议
 
 | 顺序（外 → 内） | 原因 |
@@ -251,26 +138,6 @@ repo := &ProtectionProxy{
 // 缓存订单 header 时：key 必须含 userID/tenant，且写后 Invalidate
 ```
 
-### 与装饰器、外观一起用
-
-```go
-// 组装层
-innerRepo := &SQLOrderRepository{db: db}
-lazy := &LazyOrderProxy{real: innerRepo}
-protected := &ProtectionProxy{real: lazy, auth: auth}
-audited := &AuditOrderRepoDecorator{inner: protected, audit: auditLog} // 装饰：读后打日志
-
-facade := NewCheckoutFacade(
-    cachingInventoryProxy,
-    pricingEngine,
-    paymentProcessor,
-    audited, // Facade 用的仍是 OrderRepository 接口
-    /* … */
-)
-```
-
-**Facade 不感知** 代理层数——只调 `orders.Save`；**享元** 在 `LoadLines` 之后绑定 SKU，与代理 **正交**。
-
 ### 虚拟代理与 `context`
 
 `lazyOrder` 应 **存 orderID**，在 `Lines()` 内 **接收 `ctx context.Context` 参数**，而不是闭包持有 **请求已结束的 ctx**：
@@ -287,56 +154,11 @@ func (o *lazyOrder) Lines(ctx context.Context) ([]OrderLine, error) {
 
 若 Subject 接口 **不能改**，虚拟代理返回的 **仍是** `*Order`，则 lazy 字段应在 **同请求内** 消费——文档化 **线程 / 生命周期** 约束。
 
-### 测试策略
+## 关联
 
-```go
-func TestProtectionProxy_Forbidden(t *testing.T) {
-    real := &fakeOrderRepo{order: &Order{ID: "o1"}}
-    proxy := &ProtectionProxy{
-        real: real,
-        auth: fakeAuth{allow: false},
-    }
-    _, err := proxy.GetOrder(context.Background(), "o1")
-    if !errors.Is(err, ErrForbidden) {
-        t.Fatal(err)
-    }
-    if real.getCalls != 0 {
-        t.Fatal("real should not be called")
-    }
-}
-
-func TestLazyOrderProxy_SkipsLinesUntilAccess(t *testing.T) {
-    real := &fakeOrderRepo{}
-    proxy := &LazyOrderProxy{real: real}
-    order, _ := proxy.GetOrder(context.Background(), "o1")
-    _ = order.Amount // header only
-    if real.loadLinesCalls != 0 {
-        t.Fatal("lines not loaded yet")
-    }
-    _ = order.Lines()
-    if real.loadLinesCalls != 1 {
-        t.Fatal("expected one load")
-    }
-}
-```
-
-### 动态代理与 Go
-
-Java `InvocationHandler`、C# `DispatchProxy` 可 **运行时** 生成代理；Go 倾向 **编译期显式类型**。接口方法 **很多** 时：
-
-- **按 concern 拆接口**（`OrderReader` / `OrderWriter`）减少样板；
-- 或 **代码生成**（`go generate`）——**不要** 为省文件把鉴权+缓存+日志塞进一个「上帝 Proxy」。
-
-## 小结
-
-记住这四点即可：
-
-1. **同接口替身，控制访问**：代理与 **Real Subject** 实现同一 `OrderRepository` / `InventoryService`；在 **委托前后** 做懒加载、鉴权、远程、缓存。
-2. **动机区别于装饰器**：代理管 **能否 / 何时触达**；装饰器管 **触达后多做什么**（折扣、审计可装饰，鉴权宜代理）。
-3. **客户端只依赖 Subject**：组装层 **链式** `Protection → Lazy → SQL`；[外观](/cs-fundamentals/design-patterns/facade) 与 Handler **不 import** gRPC/JWT 细节。
-4. **写操作与缓存**：`Reserve`、`Save` **直通** real 并 **失效** 缓存；只读 `CheckStock`、`GetOrder` header 才适合缓存 / 虚拟加载。
-
-[享元模式](/cs-fundamentals/design-patterns/flyweight) 压缩了 **SKU 元数据在内存中的重复**；代理模式压缩的是 **「每次访问都全量加载、裸连远程、无统一鉴权」** 的混乱——把 **对订单与库存资源的访问控制** 收进 **与主题同型** 的一层，主题继续专注 SQL 与领域规则。
+- 从接口形态看：[适配器模式](/cs-fundamentals/design-patterns/adapter) 为被封装对象提供 **不同的** 接口；代理模式提供 **相同的** 接口；[装饰模式](/cs-fundamentals/design-patterns/decorator) 提供 **增强后的** 接口。
+- [外观模式](/cs-fundamentals/design-patterns/facade) 与代理的相似之处在于它们都缓存了一个复杂实体并自行对其进行初始化。代理与其服务对象遵循同一接口，使得自己和服务对象可以互换，在这一点上它与外观不同。
+- [装饰模式](/cs-fundamentals/design-patterns/decorator) 与代理有着相似的结构，但是其意图却非常不同。这两个模式的构建都基于组合原则，也就是说一个对象应该将部分工作委派给另一个对象。两者之间的不同之处在于代理通常自行管理其服务对象的生命周期，而装饰的生成则总是由客户端进行控制。
 
 ## 参考阅读
 

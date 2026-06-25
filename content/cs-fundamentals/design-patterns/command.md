@@ -3,44 +3,58 @@ title: 命令模式
 order: 14
 ---
 
-**命令模式**（Command）亦称 **动作**、**事务**，将一个请求封装为一个对象，从而让你可以用不同的请求对客户进行参数化，对请求排队或记录请求日志，以及支持可撤销的操作。
+**命令模式**（Command）亦称 **动作**、**事务**，可将请求转换为一个包含与请求相关的所有信息的独立对象。该转换让你能根据不同的请求将方法参数化、延迟请求执行或将其放入队列中，且能实现可撤销操作。
 
 通俗地说，每个操作包成一个独立对象，谁执行、何时执行、执行过了没有，都可以单独管理；于是自然支持排队、撤销、重做和审计回放，多种入口也能共用同一套操作抽象。
 
 ## 问题
 
-运营后台改数量、改地址，大促结束批量关单，离线 App 要把操作 **先入队、联网后再执行**——同一类操作会从 **HTTP、MQ、CLI** 等多种入口触发，且常要 **撤销、重试、审计回放**。
+你在做 **运营后台**：工具栏上有「改数量」「改地址」「取消订单」等按钮；订单详情页右键菜单、批量任务脚本、MQ 补偿 Worker 也要触发 **同一类写操作**，且产品要求 **撤销 / 重做** 与 **操作审计**。
 
-最直接的做法是各入口 **直接调** `OrderService` 的方法。操作种类少时还能应付；产品要 Undo 和批量重试时，问题就会一起暴露：
-
-1. **调用方与领域紧耦合**：Handler、Consumer、脚本都依赖 `OrderService` 十几个方法，改签名要改所有入口。
-2. **无法撤销 / 重做**：改数量没有记录旧值；产品要「撤销」只能手写反向 SQL，易漏字段。
-3. **难以排队与重试**：削峰关单、失败重试需要 **把操作存下来再执行**——现在只有即时方法调用。
-4. **审计与回放弱**：日志记了「谁调了 API」，但没有 **可重放的命令对象**。
-
-本质矛盾是：**同一类业务操作** 会从 **多种入口、多种时机** 触发，且常要 **记录、重试、撤销**；却用 **分散的直接方法调用** 来表达。典型写法如下：
+最直接的做法是给每种操作建 **按钮子类** 或让各入口 **直接调** `OrderService`：
 
 ```go
-func (h *AdminHandler) AdjustQuantity(w http.ResponseWriter, r *http.Request) {
-    // 直接调 Service——没有记录旧值，也没有统一 Undo
-    h.orders.SetLineQuantity(r.Context(), orderID, sku, qty)
-}
+type AdjustQtyButton struct { orders OrderService; /* … */ }
+func (b *AdjustQtyButton) OnClick() { b.orders.SetLineQuantity(/* … */) }
 
-func (s *FlashSaleRollback) RollbackOversold(ctx context.Context, ids []string) error {
-    for _, id := range ids {
-        if err := s.orders.Cancel(ctx, id); err != nil {
-            return err // 中途失败：前面已取消的怎么回滚？
-        }
-    }
-    return nil
-}
+type CancelOrderButton struct { orders OrderService }
+func (b *CancelOrderButton) OnClick() { b.orders.Cancel(/* … */) }
+// … 每个操作一个子类；HTTP Handler、脚本再各写一遍
 ```
+
+操作少时还能应付；入口一多，问题就会一起暴露：
+
+1. **UI 与领域紧耦合**：改 `OrderService` 签名，工具栏、菜单、Handler、脚本 **全要改**——表现层依赖不稳定的业务 API。
+2. **同一操作多处重复**：「取消订单」在工具栏、详情菜单、大促回滚脚本里 **各写一遍**，补偿逻辑不一致。
+3. **无法统一撤销**：改数量没快照旧值；Undo 只能手写反向 SQL，中途失败的批量关单 **无法回滚已执行部分**。
+4. **难以排队与回放**：离线同步、削峰批处理需要 **把操作存成对象再执行**——现在只有即时方法调用，日志也无法 **重放**。
+
+本质矛盾是：**Admin 层只应触发操作**，**OrderService 层才管业务规则**；同一操作又会从 **多种 UI / 多种时机** 触发，且常要 **记录、延迟、撤销**——却用 **分散的直接调用** 或 **按钮子类爆炸** 来表达。
 
 ## 解决方案
 
-定义 **命令接口**；各 **具体命令** 保存 Receiver 引用与参数，在 `Execute` / `Undo` 里调用 Receiver；**Invoker** 执行命令并可选维护历史。
+优秀设计会把 **表现层** 与 **业务逻辑层** 分开：Admin UI 负责渲染与捕获输入；`OrderService` 负责改数量、取消单等领域规则。两层之间不应让 Handler **直接** `orders.SetLineQuantity(...)`，而应将 **请求的全部细节**（调谁、什么方法、哪些参数）抽成 **命令对象**。
 
-### 命令（Command）接口
+### 命令连接两层
+
+```text
+Admin 按钮 / Handler  ──触发──▶  Command.Execute()
+                                      │
+                                      ▼
+                               OrderService（Receiver）
+```
+
+Admin 对象 **只持有 Command 引用** 并触发它，不必知道 Receiver 怎么处理；Command 在 `Execute` 里把调用 **委派** 给 `OrderService`。同一 `CancelOrderCommand` 可绑到工具栏按钮、右键菜单和大促回滚脚本—— **一处定义，多处触发**。
+
+### 角色与代码
+
+| 角色 | 电商中的对应 |
+| :--- | :--- |
+| **Client** | 组装层：创建 `AdjustQuantityCommand` 并交给 Invoker / 按钮 |
+| **Command** | `Execute` / `Undo` 接口 |
+| **Concrete Command** | `AdjustQuantityCommand`：保存 `orderID`、`sku`、`newQty` 与 Receiver |
+| **Receiver** | `OrderService`：真正改库 |
+| **Invoker（Sender）** | `Invoker` 或 `AdminSession`：执行命令、维护历史栈 |
 
 ```go
 type Command interface {
@@ -48,42 +62,16 @@ type Command interface {
     Undo(ctx context.Context) error
 }
 
-// 不可撤销的操作（如发不可撤回短信）可实现 NoUndo
-type NoUndo struct{}
-
-func (NoUndo) Undo(context.Context) error { return ErrUndoNotSupported }
-```
-
-若只需排队、不需 Undo，可拆成 `Executable` 接口；文档为与 GoF 对齐保留 `Undo`。
-
-### 接收者（Receiver）——领域服务
-
-```go
 type OrderService interface {
     GetLineQuantity(ctx context.Context, orderID, sku string) (int, error)
     SetLineQuantity(ctx context.Context, orderID, sku string, qty int) error
-    UpdateShippingAddress(ctx context.Context, orderID string, addr Address) error
     Cancel(ctx context.Context, orderID string) error
 }
-```
 
-命令 **不替代** Receiver 的业务规则；只是把 **一次调用 + 逆操作所需状态** 包起来。
-
-### 具体命令：改数量（可撤销）
-
-```go
 type AdjustQuantityCommand struct {
-    orders  OrderService
-    orderID string
-    sku     string
-    newQty  int
-    oldQty  int // Execute 前快照，供 Undo
-}
-
-func NewAdjustQuantityCommand(orders OrderService, orderID, sku string, newQty int) *AdjustQuantityCommand {
-    return &AdjustQuantityCommand{
-        orders: orders, orderID: orderID, sku: sku, newQty: newQty,
-    }
+    orders         OrderService
+    orderID, sku   string
+    newQty, oldQty int
 }
 
 func (c *AdjustQuantityCommand) Execute(ctx context.Context) error {
@@ -91,7 +79,7 @@ func (c *AdjustQuantityCommand) Execute(ctx context.Context) error {
     if err != nil {
         return err
     }
-    c.oldQty = qty
+    c.oldQty = qty // Execute 时快照，供 Undo；勿在构造时读
     return c.orders.SetLineQuantity(ctx, c.orderID, c.sku, c.newQty)
 }
 
@@ -100,289 +88,92 @@ func (c *AdjustQuantityCommand) Undo(ctx context.Context) error {
 }
 ```
 
-`oldQty` 在 **首次 Execute** 时捕获——**不要**在构造命令时读，否则并发下可能不准。
+改地址、取消单 **各一个 ConcreteCommand**；不可撤销操作（如已发短信）让 `Undo` 返回 `ErrUndoNotSupported`。
 
-### 具体命令：改地址
-
-```go
-type UpdateAddressCommand struct {
-    orders  OrderService
-    orderID string
-    newAddr Address
-    oldAddr Address
-}
-
-func (c *UpdateAddressCommand) Execute(ctx context.Context) error {
-    // 从 orders 读 oldAddr（略）
-    return c.orders.UpdateShippingAddress(ctx, c.orderID, c.newAddr)
-}
-
-func (c *UpdateAddressCommand) Undo(ctx context.Context) error {
-    return c.orders.UpdateShippingAddress(ctx, c.orderID, c.oldAddr)
-}
-```
-
-### 调用者（Invoker）——执行与历史栈
+### Invoker 与 Admin 入口
 
 ```go
 type Invoker struct {
     history []Command
-    cursor  int // 指向「已执行」栈顶；Undo 用
 }
 
 func (i *Invoker) Run(ctx context.Context, cmd Command) error {
     if err := cmd.Execute(ctx); err != nil {
         return err
     }
-    // 新执行截断「重做」分支
-    i.history = append(i.history[:i.cursor], cmd)
-    i.cursor = len(i.history)
+    i.history = append(i.history, cmd)
     return nil
 }
 
 func (i *Invoker) Undo(ctx context.Context) error {
-    if i.cursor == 0 {
+    if len(i.history) == 0 {
         return ErrNothingToUndo
     }
-    i.cursor--
-    return i.history[i.cursor].Undo(ctx)
+    cmd := i.history[len(i.history)-1]
+    i.history = i.history[:len(i.history)-1]
+    return cmd.Undo(ctx)
 }
 
-func (i *Invoker) Redo(ctx context.Context) error {
-    if i.cursor >= len(i.history) {
-        return ErrNothingToRedo
-    }
-    cmd := i.history[i.cursor]
-    if err := cmd.Execute(ctx); err != nil {
-        return err
-    }
-    i.cursor++
-    return nil
-}
-```
-
-运营后台 **一个 Invoker 实例 per 编辑会话**；HTTP 无状态场景可把命令 **序列化进 DB** 再做 Undo（见 [实践](#实践)）。
-
-### 宏命令（Composite Command）
-
-```go
-type MacroCommand struct {
-    cmds []Command
-}
-
-func (m *MacroCommand) Execute(ctx context.Context) error {
-    for _, c := range m.cmds {
-        if err := c.Execute(ctx); err != nil {
-            return err
-        }
-    }
-    return nil
-}
-
-func (m *MacroCommand) Undo(ctx context.Context) error {
-    for j := len(m.cmds) - 1; j >= 0; j-- {
-        if err := m.cmds[j].Undo(ctx); err != nil {
-            return err
-        }
-    }
-    return nil
-}
-
-// 大促回滚：批量取消（每条是一个 CancelOrderCommand）
-func NewFlashSaleRollback(orders OrderService, ids []string) *MacroCommand {
-    cmds := make([]Command, len(ids))
-    for i, id := range ids {
-        cmds[i] = NewCancelOrderCommand(orders, id)
-    }
-    return &MacroCommand{cmds: cmds}
-}
-```
-
-宏命令 **Execute 正序、Undo 逆序**；任一步失败时，若需 **部分回滚**，要在 `Execute` 内 **try/compensate** 或改用 **Saga**（命令模式作 **单步补偿单元**）。
-
-### 客户端（Client）——Admin API
-
-```go
-type AdminHandler struct {
+type AdminAction struct {
+    cmd     Command
     invoker *Invoker
-    orders  OrderService
 }
 
-func (h *AdminHandler) AdjustQuantity(w http.ResponseWriter, r *http.Request) {
-    cmd := NewAdjustQuantityCommand(h.orders, orderID, sku, newQty)
-    if err := h.invoker.Run(r.Context(), cmd); err != nil {
-        http.Error(w, err.Error(), 500)
-        return
-    }
-}
-
-func (h *AdminHandler) Undo(w http.ResponseWriter, r *http.Request) {
-    if err := h.invoker.Undo(r.Context()); err != nil {
-        http.Error(w, err.Error(), 400)
-    }
+func (a *AdminAction) Trigger(ctx context.Context) error {
+    return a.invoker.Run(ctx, a.cmd)
 }
 ```
 
-Client **只构造具体命令类型**（或用工厂）；执行路径 **统一走 Invoker**。
+Client 在启动时 **预配置** 命令（注入 `OrderService` 与参数），再挂到按钮 / Handler；Invoker **不创建** 命令，只 **执行** 客户端传入的实例——与 [Refactoring.Guru](https://refactoringguru.cn/design-patterns/command) 中的 Sender 职责一致。
 
+### 类比：厨房订单小票
+
+服务员把「两份加辣、少冰」写在 **订单小票** 上贴进厨房队列；厨师按小票做菜，不必跑回桌边确认。小票就是 **命令**：在烹饪前一直排队，包含 **全部参数**；Admin 触发命令、Worker 异步消费命令，是同一抽象。
 
 ## 适用场景
 
-1. **要把操作参数化**：同一 `Invoker.Run` 可执行改数量、改地址、取消单——**多态请求**。
-2. **撤销 / 重做**：运营后台、可视化配置、文档编辑器式交互。
-3. **排队、延迟、重试**：离线同步、削峰批处理、MQ 消费 **一条消息 = 一个 Command**。
-4. **审计与回放**：命令对象 **序列化存库**，合规回放「谁在何时执行了什么」。
-5. **宏操作与脚本化**：批量关单、批量改仓 = `MacroCommand` 或命令列表。
-6. **解耦 UI 与领域**：按钮 / 快捷键 **只绑定 Command**，不直接调 Service。
+1. **用操作参数化对象**：同一 `Invoker.Run` 或 `AdminAction` 可绑定改数量、改地址、取消单——运行时 **换命令即换行为**。
+2. **排队、延迟、远程执行**：离线 App 同步、MQ 削峰关单——命令 **可序列化** 后入队、重试、发到远程 Worker。
+3. **撤销 / 重做**：运营后台编辑会话；命令历史栈或持久化 `operation_log`（复杂状态可配合 [备忘录](/cs-fundamentals/design-patterns/memento)）。
+4. **宏操作**：大促回滚 = 多个 `CancelOrderCommand` 组合（见 **实践**）。
+5. **解耦 UI 与领域**：HTTP、CLI、定时任务 **只依赖 Command 接口**，不 import 十几个 Service 方法。
 
 **不必强行使用**：
 
-- **一次性、永不撤销、单入口** 的 `orders.Cancel`——直接调方法更简单。
-- **整单 PlaceOrder** 级编排——用 [外观](/cs-fundamentals/design-patterns/facade)；命令管 **单步**，不是替代 Facade。
-- **多个处理者择一处理请求**——用 [责任链](/cs-fundamentals/design-patterns/chain-of-responsibility)，不是命令。
-- **运行时切换算法**（计价策略）——用 Strategy；命令是 **操作记录**，不是 **算法族**。
-- **Undo 成本极高或不可能**（已发货、已扣款）——命令仍可 **入队执行**，但 `Undo` 返回 `ErrUndoNotSupported` 或走 **人工补偿流程**。
+- **一次性、单入口、永不撤销** 的 `orders.Cancel`——直接调方法更简单。
+- **整单 PlaceOrder** 级编排——用 [外观](/cs-fundamentals/design-patterns/facade)；命令管 **可撤销的单步写**，不替代 Facade。
+- **多个处理者择一处理**——用 [责任链](/cs-fundamentals/design-patterns/chain-of-responsibility)。
+- **运行时切换算法**（会员价怎么算）——用 [策略](/cs-fundamentals/design-patterns/strategy)；命令是 **操作记录**，不是 **算法族**。
 
-常见例子：文本编辑器 Undo/Redo、GUI `Action`/`Runnable`、线程池 `Runnable`、CQRS 写模型、数据库事务日志、游戏输入回放、Redis `MULTI` 内的命令队列思想。
+常见例子：GUI `Action` / `Runnable`、CQRS 写侧、数据库事务日志、线程池任务队列。
 
 ## 优缺点
 
 | 优点 | 说明 |
 | :--- | :--- |
-| **解耦调用方与接收者** | Handler 只依赖 `Command` + `Invoker` |
-| **开闭** | 新操作 **新 ConcreteCommand**，少改 Invoker |
-| **撤销 / 重做** | 统一历史栈或持久化命令日志 |
-| **可组合** | 宏命令、管道式「命令链」 |
-| **天然适配队列** | 序列化后异步执行、失败重试 |
-| **审计友好** | 命令对象即操作记录 |
+| **单一职责** | 触发（Admin / Invoker）与执行（Receiver）解耦 |
+| **开闭** | 新操作 = 新 `ConcreteCommand`，少改 Invoker |
+| **撤销 / 重做 / 延迟** | 命令对象即操作记录，可入栈、序列化、回放 |
+| **可组合** | 宏命令、与责任链 / 外观 **正交** 分层 |
+| **多入口复用** | 同一命令绑工具栏、菜单、脚本 |
 
 | 缺点 | 说明 |
 | :--- | :--- |
-| **类数量增加** | 每个操作一个命令类型；可用工厂或代码生成缓解 |
-| **Undo 语义难** | 逆操作要 **业务上可定义**；分布式场景常需 Saga |
-| **状态快照** | 命令要保存 **足够的旧值**；构造时机要防并发脏读 |
-| **与事件职责重叠** | 团队需约定：**命令 = 意图**，**事件 = 已发生事实** |
-| **宏命令部分失败** | 要定义 **补偿策略**，不能假设 `Undo` 总能救场 |
+| **类数量增加** | 每个操作一个命令类型 |
+| **Undo 语义难** | 分布式 / 已发货场景常需 Saga 或禁止 Undo |
+| **状态快照成本** | 备份旧值占内存；也可改用 **反向命令** 但未必可实现 |
+| **宏命令部分失败** | 需定义补偿策略，不能假设 `Undo` 总能救场 |
 
-## 实践
+## 关联
 
-> **阅读提示**：先掌握「**Command 封装操作 + Receiver 干活 + Invoker 执行**」即可。本节是工程变体；初学可先跳过。
-
-### 持久化命令日志（跨请求 Undo）
-
-HTTP 无状态时，把命令 **序列化** 进 `operation_log`：
-
-```go
-type StoredCommand struct {
-    ID      string
-    Type    string          // "adjust_qty"
-    Payload json.RawMessage
-    UserID  string
-    Undone  bool
-}
-
-// Execute 成功后写入 log；Undo 时读 Payload 重建 ConcreteCommand
-func (s *OperationLogService) Replay(ctx context.Context, id string) error {
-    rec, err := s.repo.Get(ctx, id)
-    // ...
-    cmd, err := s.factory.FromStored(rec)
-    return cmd.Execute(ctx)
-}
-```
-
-**工厂**（Factory）根据 `Type` 反序列化——与 [工厂方法](/cs-fundamentals/design-patterns/factory) 配合，避免 `switch` 散落在各处。
-
-### 命令队列与重试
-
-```go
-type CommandQueue struct {
-    ch chan Command
-}
-
-func (q *CommandQueue) Enqueue(cmd Command) {
-    q.ch <- cmd
-}
-
-func (q *CommandQueue) Worker(ctx context.Context) {
-    for {
-        select {
-        case cmd := <-q.ch:
-            if err := cmd.Execute(ctx); err != nil {
-                metrics.Inc("command_failed")
-                // 死信 / 指数退避重试
-            }
-        case <-ctx.Done():
-            return
-        }
-    }
-}
-```
-
-离线 App **同步购物车**、大促 **异步关单** 适合 **Enqueue**；注意命令 **可序列化**（参数用 ID，不要塞 `*sql.Tx`）。
-
-### 与外观、责任链一起用
-
-```text
-HTTP PlaceOrder
-  → preCheckChain.Handle（责任链）
-  → facade.PlaceOrderCore（外观）
-
-Admin AdjustQuantity
-  → invoker.Run(AdjustQuantityCommand)（命令）
-
-Batch rollback
-  → queue.Enqueue(MacroCommand{...})
-```
-
-[责任链](/cs-fundamentals/design-patterns/chain-of-responsibility) 在 **下单前**；[外观](/cs-fundamentals/design-patterns/facade) 在 **用例编排**；命令在 **可撤销 / 可排队的单步写操作**——三层 **正交**。
-
-### Undo 与领域约束
-
-| 操作 | Undo 是否可行 | 做法 |
-| :--- | :--- | :--- |
-| 改未支付订单数量 | 可行 | 快照 `oldQty` |
-| 改已发货地址 | 常不可行 | `Undo` 返回错误或转 **工单** |
-| 取消已支付订单 | 需退款 | `CancelOrderCommand.Undo` 触发 **RefundCommand** 或禁止 Undo |
-
-在 `Execute` 前用 **领域状态机** 校验：`if order.Status == Shipped { return ErrNotAdjustable }`。
-
-### 测试策略
-
-```go
-func TestAdjustQuantityCommand_UndoRestoresOldQty(t *testing.T) {
-    orders := &fakeOrders{lines: map[string]int{"sku-a": 2}}
-    cmd := NewAdjustQuantityCommand(orders, "o1", "sku-a", 5)
-    _ = cmd.Execute(context.Background())
-    _ = cmd.Undo(context.Background())
-    if orders.lines["sku-a"] != 2 {
-        t.Fatal("expected qty 2 after undo")
-    }
-}
-
-func TestMacroCommand_UndoReverseOrder(t *testing.T) {
-    var log []string
-    c1 := &recordingCommand{name: "a", log: &log}
-    c2 := &recordingCommand{name: "b", log: &log}
-    m := &MacroCommand{cmds: []Command{c1, c2}}
-    _ = m.Execute(context.Background())
-    _ = m.Undo(context.Background())
-    // Undo 应先 b 后 a
-    if log[len(log)-2] != "undo-b" || log[len(log)-1] != "undo-a" {
-        t.Fatal(log)
-    }
-}
-```
-
-## 小结
-
-记住这四点即可：
-
-1. **操作即对象**：改数量、取消单、改地址各是一个 `Command`，带参数与可选 `Undo`。
-2. **Invoker 统一执行**：调用方 `Run(cmd)`，不 scattered 调十个 Service 方法。
-3. **与 Facade / 责任链分层**：Facade 编排 **整单用例**；责任链做 **前置检查**；命令管 **可撤销、可排队的单步写**。
-4. **宏命令与队列**：批量关单 = 多个 `ConcreteCommand` 组合或入队；失败要有 **补偿或重试** 策略。
-
-[责任链](/cs-fundamentals/design-patterns/chain-of-responsibility) 解决 **「谁来处理这个请求」**；命令解决 **「把这个操作存下来、排队、撤销、回放」**——把 **请求** 从 **方法调用** 提升为 **一等对象**，让运营工具与异步 Worker 在同一套抽象上协作，并符合 [开闭](/cs-fundamentals/design-patterns#设计原则) 与 **单一职责**。
+- [责任链模式](/cs-fundamentals/design-patterns/chain-of-responsibility)、命令模式、[中介者模式](/cs-fundamentals/design-patterns/mediator) 和 [观察者模式](/cs-fundamentals/design-patterns/observer) 均用于在不同对象之间传递请求，但各自采用不同的方法。责任链模式按顺序传递请求，直到有一个接收者处理它；命令模式在发送者和请求者之间建立单向连接；中介者模式让发送者和请求者完全消除相互引用，只能通过中介对象间接通信；观察者模式允许接收者动态订阅或取消订阅接收请求。
+- 处理者（Handler）通常以命令模式的形式实现。在这种情况下，你可以对由请求所代表的同一个上下文对象执行许多不同的操作。还有另一种实现方式，即请求本身是一个命令对象。在这种情况下，你可以对由一系列不同上下文所组成的链执行同一个操作。
+- 你可以使用命令模式和 [备忘录模式](/cs-fundamentals/design-patterns/memento) 来实现「撤销」。在这种情况下，命令用于对目标对象执行各种不同的操作，备忘录用来在命令执行之前保存该对象的状态。
+- 命令模式和 [策略模式](/cs-fundamentals/design-patterns/strategy) 看上去很像，因为两者均能用某些行为来参数化对象。但是，它们的意图完全不同。
+  - 使用命令模式，你可以将任何操作转换为对象，该对象中的操作参数则成为对象的成员变量。你可以延迟执行该操作、将其放入队列、记录操作历史或者向远程服务发送对象等。
+  - 使用策略模式，你通常可以描述实现同一目标的不同方式，使你在同一个上下文类中切换不同的算法。
+- 可以使用 [原型模式](/cs-fundamentals/design-patterns/prototype) 来保存命令模式的历史记录。
+- [访问者模式](/cs-fundamentals/design-patterns/visitor) 可以被看作是命令模式的增强版本，其对象能对不同类的多种对象执行操作。
 
 ## 参考阅读
 

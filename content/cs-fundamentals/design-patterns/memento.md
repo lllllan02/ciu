@@ -32,174 +32,71 @@ func (h *DraftHistory) Save(d OrderDraft) {
 
 ## 解决方案
 
-定义 **Memento**（对 Caretaker 窄接口）；**Originator** 负责 **从当前状态创建 Memento** 与 **从 Memento 恢复**；**Caretaker** 只存 **`[]Memento` 或栈**。
+定义 **Memento**（对 Caretaker 只暴露元数据）；**Originator** 负责 `Save` / `Restore`；**Caretaker** 只存 `[]Memento`，**不** 读写字段。
 
-### 备忘录（Memento）——对外 opaque
-
-Go 用 **非导出 struct + 同包 Originator** 或 **导出但零字段访问** 的句柄：
+### 三种角色
 
 ```go
-// 包 orderdraft：Caretaker 只能持有 *Snapshot，不能读字段
-type Snapshot struct {
-    id        string
-    createdAt time.Time
-    label     string
-    // 以下字段小写——仅 Originator 同包可构造/读取
-    lines     []OrderLine
-    address   Address
-    coupon    string
-    note      string
-    version   int
-}
-
-// 对 Caretaker 暴露的窄接口：只有元数据
 type Memento interface {
     ID() string
-    CreatedAt() time.Time
     Label() string
 }
 
-func (s *Snapshot) ID() string           { return s.id }
-func (s *Snapshot) CreatedAt() time.Time { return s.createdAt }
-func (s *Snapshot) Label() string        { return s.label }
-```
+type Snapshot struct {
+    id, label string
+    lines     []OrderLine // 小写：仅 Originator 同包可读写
+    address   Address
+    coupon    string
+}
 
-若 Memento 需 **跨包** 传递，可用 **导出 struct + 未导出字段**（同 module 内 Originator 仍可访问）或 **序列化 bytes** 由 Originator **独家 Deserialize**。
-
-### 发起人（Originator）——OrderDraft
-
-```go
 type OrderDraft struct {
-    id      string
     lines   []OrderLine
     address Address
     coupon  string
-    note    string
-    version int
 }
 
 func (d *OrderDraft) Save(label string) Memento {
     return &Snapshot{
-        id:        uuid.NewString(),
-        createdAt: time.Now(),
-        label:     label,
-        lines:     d.deepCopyLines(), // Originator 知道如何深拷贝组合树
-        address:   d.address,
-        coupon:    d.coupon,
-        note:      d.note,
-        version:   d.version,
+        id: uuid.NewString(), label: label,
+        lines: d.deepCopyLines(), address: d.address, coupon: d.coupon,
     }
 }
 
 func (d *OrderDraft) Restore(m Memento) error {
-    snap, ok := m.(*Snapshot)
-    if !ok {
-        return ErrInvalidMemento
-    }
-    if snap.version > d.version+1 {
-        return ErrSnapshotTooNew // 可选：防并发乱序
-    }
+    snap := m.(*Snapshot)
     d.lines = cloneLines(snap.lines)
-    d.address = snap.address
-    d.coupon = snap.coupon
-    d.note = snap.note
-    d.version = snap.version
+    d.address, d.coupon = snap.address, snap.coupon
     return d.validateInvariants()
-}
-
-func cloneLines(src []OrderLine) []OrderLine {
-    // 与 Composite 树一致：递归 Clone OrderLine
-    out := make([]OrderLine, len(src))
-    copy(out, src)
-    return out
-}
-
-func (d *OrderDraft) deepCopyLines() []OrderLine {
-    return cloneLines(d.lines)
-}
-
-func (d *OrderDraft) validateInvariants() error {
-    if len(d.lines) == 0 {
-        return ErrEmptyDraft
-    }
-    return nil
 }
 ```
 
-**深拷贝与校验** 只在 Originator；Caretaker **never** `snap.lines = ...`。
+深拷贝与校验 **只在 Originator**；Caretaker 拿到的 `Memento` **看不到** `lines` / `coupon`。
 
-### 保管者（Caretaker）——历史栈
+### Caretaker 与客户端
 
 ```go
 type History struct {
     stack []Memento
-    limit int
 }
 
-func NewHistory(limit int) *History {
-    return &History{limit: limit}
-}
-
-func (h *History) Push(m Memento) {
-    h.stack = append(h.stack, m)
-    if h.limit > 0 && len(h.stack) > h.limit {
-        h.stack = h.stack[1:]
-    }
-}
+func (h *History) Push(m Memento) { h.stack = append(h.stack, m) }
 
 func (h *History) Pop() (Memento, error) {
     if len(h.stack) == 0 {
         return nil, ErrNothingToRestore
     }
-    n := len(h.stack) - 1
-    m := h.stack[n]
-    h.stack = h.stack[:n]
+    m := h.stack[len(h.stack)-1]
+    h.stack = h.stack[:len(h.stack)-1]
     return m, nil
 }
 
-func (h *History) List() []Memento {
-    out := make([]Memento, len(h.stack))
-    copy(out, h.stack)
-    return out // UI 只显示 Label / CreatedAt
-}
+// 开始编辑前存检查点；恢复时 Pop 再 Restore
+history.Push(draft.Save("before_edit"))
+m, _ := history.Pop()
+_ = draft.Restore(m)
 ```
 
-Caretaker **不负责** Restore——只 **把 Memento 还给** Originator：
-
-```go
-m, err := history.Pop()
-if err != nil {
-    return err
-}
-return draft.Restore(m)
-```
-
-### 客户端——运营编辑会话
-
-```go
-type EditSession struct {
-    draft   *OrderDraft
-    history *History
-}
-
-func (s *EditSession) BeginEdit() {
-    s.history.Push(s.draft.Save("before_edit"))
-}
-
-func (s *EditSession) UndoCheckpoint() error {
-    m, err := s.history.Pop()
-    if err != nil {
-        return err
-    }
-    return s.draft.Restore(m)
-}
-
-func (s *EditSession) AutoSave(label string) {
-    s.history.Push(s.draft.Save(label))
-}
-```
-
-用户 **改地址、改券、改明细** 可仍走 [命令](/cs-fundamentals/design-patterns/command) **逐步落库**；**会话级回滚** 调 `UndoCheckpoint()` **整包恢复**。
+单步改数量仍可用 [命令](/cs-fundamentals/design-patterns/command) `Undo`；**整包回到检查点** 才用备忘录。持久化、增量快照、与 Command 组合见 **实践** 一节。
 
 
 ## 适用场景
@@ -237,20 +134,6 @@ func (s *EditSession) AutoSave(label string) {
 | **Go 封装技巧** | 跨包 opaque 需 **接口 + 私有实现** 或 **[]byte** |
 
 ## 实践
-
-> **阅读提示**：先掌握「**Originator Save/Restore，Caretaker 只存 opaque**」即可。本节是工程变体；初学可先跳过。
-
-### 与命令模式组合
-
-```text
-EditSession
-  BeginEdit → history.Push(draft.Save())
-  每步操作 → invoker.Run(AdjustQuantityCommand)  // 命令：单步 Undo
-  「还原检查点」→ draft.Restore(history.Pop())    // 备忘录：整包状态
-  Submit → facade.PlaceOrder(...)
-```
-
-**命令** 管 **可审计的单步**；**备忘录** 管 **会话检查点**——产品「撤销上一步」vs「回到自动保存」。
 
 ### 持久化 Caretaker（崩溃恢复）
 
@@ -294,25 +177,6 @@ DB 存 **bytes**；**decode** 只在 Originator 包——外部 **无法** 手�
 
 增量仍由 **Originator.Save** 决定 **存什么**；Caretaker **不变**。
 
-### 与中介者、组合一起用
-
-```go
-// 结算页 Mediator 持有 CheckoutContext
-func (m *CheckoutMediator) SaveCheckpoint(label string) Memento {
-    return m.origin.Save(label) // Originator = 可序列化的 Draft
-}
-
-// 恢复后 Refresh 各 Colleague
-func (m *CheckoutMediator) RestoreCheckpoint(mem Memento) error {
-    if err := m.origin.Restore(mem); err != nil {
-        return err
-    }
-    return m.refreshAll(context.Background())
-}
-```
-
-[组合](/cs-fundamentals/design-patterns/composite) 明细树 **深拷贝** 在 `OrderDraft.deepCopyLines`；[中介者](/cs-fundamentals/design-patterns/mediator) **Restore 后** 统一 `Refresh` 面板。
-
 ### Memento 版本迁移
 
 ```go
@@ -334,41 +198,11 @@ func decodeSnapshot(blob []byte) (Memento, error) {
 
 **Originator 字段变了**——旧快照 **在 decode 层迁移**，不交给 Caretaker。
 
-### 测试策略
+## 关联
 
-```go
-func TestOrderDraft_RestorePreservesLines(t *testing.T) {
-    d := &OrderDraft{lines: []OrderLine{ProductLine{SKU: "a", Quantity: 2}}}
-    mem := d.Save("t0")
-    d.lines[0] = ProductLine{SKU: "a", Quantity: 99}
-    if err := d.Restore(mem); err != nil {
-        t.Fatal(err)
-    }
-    if pl := d.lines[0].(ProductLine); pl.Quantity != 2 {
-        t.Fatal("expected qty 2")
-    }
-}
-
-func TestHistory_CannotMutateSnapshot(t *testing.T) {
-    d := &OrderDraft{/* … */}
-    h := NewHistory(10)
-    h.Push(d.Save("x"))
-    mem, _ := h.Pop()
-    // 包外测试：Memento 接口无 Lines 字段——编译期无法篡改
-    _ = d.Restore(mem)
-}
-```
-
-## 小结
-
-记住这四点即可：
-
-1. **快照 opaque**：Caretaker **只存** `Memento`；**读写字段** 仅 Originator。
-2. **Save / Restore 成对**：深拷贝、校验 **集中在 Originator**。
-3. **与 Command 分层**：命令 **单步 Undo**；备忘录 **检查点 / 整包恢复**。
-4. **成本要管**：`History.limit`、持久化 **encode 在包内**、大订单 **增量 Memento**。
-
-[命令模式](/cs-fundamentals/design-patterns/command) 解决了 **「把操作变成可撤销对象」**；备忘录解决了 **「在不泄露内部结构的前提下，保存并恢复任意复杂状态」**——让运营草稿、结算页自动保存与崩溃恢复 **在封装边界内** 安全演进，并符合 [单一职责](/cs-fundamentals/design-patterns#设计原则)（Caretaker 只管保管，Originator 管状态语义）。
+- 你可以同时使用 [命令模式](/cs-fundamentals/design-patterns/command) 和备忘录模式来实现「撤销」。在这种情况下，命令用于对目标对象执行各种不同的操作，备忘录用来保存一条命令执行前该对象的状态。
+- 你可以同时使用备忘录模式和 [迭代器模式](/cs-fundamentals/design-patterns/iterator) 来获取当前迭代器的状态，并且在需要的时候进行回滚。
+- 有时候 [原型模式](/cs-fundamentals/design-patterns/prototype) 可以作为备忘录模式的一个简化版本，其条件是你需要在历史记录中存储的对象的状态比较简单，不需要链接其他外部资源，或者链接可以方便地重建。
 
 ## 参考阅读
 
